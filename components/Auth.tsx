@@ -275,8 +275,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       <div className="glass-card w-full max-w-lg p-8 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700/50 relative z-10 bg-white/70 dark:bg-slate-900/70">
         <div className="text-center mb-8">
            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 mb-4 shadow-[0_0_15px_rgba(0,243,255,0.3)] animate-glow">
+             {/* UPDATED LOGO: MICROPHONE (Matches Landing Page) */}
              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
              </svg>
            </div>
            <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Speak<span className="text-cyan-600 dark:text-cyan-400">Pro</span></h1>
