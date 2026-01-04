@@ -1,0 +1,7 @@
+{
+  "name": "SpeakPro AI",
+  "description": "Professional IELTS Speaking simulator powered by Advanced AI. Practice with an AI examiner and get instant feedback based on official band descriptors.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
