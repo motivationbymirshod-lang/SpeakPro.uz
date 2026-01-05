@@ -177,7 +177,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
     setLoading(true);
 
-    const API_URL = 'https://speakpro-uz.onrender.com'; 
+    const API_URL = 'https://speakpro-uz.onrender.com/api'; 
 
     try {
         if (isLogin) {
