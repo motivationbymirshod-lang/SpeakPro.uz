@@ -1,26 +1,43 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { UserProfile, AppState, ExamResult } from './types';
-import Auth from './components/Auth';
-import Dashboard from './components/Dashboard';
-import ExamRoom from './components/ExamRoom';
-import Results from './components/Results';
-import AdminPanel from './components/AdminPanel';
-import TeacherDashboard from './components/TeacherDashboard'; // Import new B2B Dashboard
-import FeedbackWidget from './components/FeedbackWidget'; // NEW WIDGET
-import Landing from './components/Landing'; // NEW LANDING
 import { generateExamFeedback } from './services/aiService';
 import { getCurrentUser, saveUser } from './utils/storageUtils';
 import { trackEvent } from './utils/analytics';
+import { API_BASE_URL } from './config/api';
+
+// LAZY LOAD COMPONENTS
+// Landing page removed as per requirement
+const Auth = React.lazy(() => import('./components/Auth'));
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
+const TeacherDashboard = React.lazy(() => import('./components/TeacherDashboard'));
+const ExamRoom = React.lazy(() => import('./components/ExamRoom'));
+const Results = React.lazy(() => import('./components/Results'));
+const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
+const FeedbackWidget = React.lazy(() => import('./components/FeedbackWidget'));
+
+// Loading Screen
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+    <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+);
 
 function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [appState, setAppState] = useState<AppState>(AppState.LANDING);
+  // CHANGE: Start directly at AUTH (Login/Signup) instead of LANDING
+  const [appState, setAppState] = useState<AppState>(AppState.AUTH);
   const [examResult, setExamResult] = useState<ExamResult | null>(null);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   
   // THEME STATE
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
+
+  // Debugging Production URL issue
+  useEffect(() => {
+    console.log("Current Environment Hostname:", window.location.hostname);
+    console.log("Configured API Base URL:", API_BASE_URL);
+  }, []);
 
   // Theme Effect
   useEffect(() => {
@@ -31,7 +48,6 @@ function App() {
         } else if (t === 'light') {
             root.classList.remove('dark');
         } else {
-            // System
             if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
                 root.classList.add('dark');
             } else {
@@ -39,11 +55,9 @@ function App() {
             }
         }
     };
-    
     applyTheme(theme);
     localStorage.setItem('theme', theme);
 
-    // Listener for system changes if mode is system
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
         if (theme === 'system') applyTheme('system');
@@ -61,7 +75,6 @@ function App() {
   useEffect(() => {
     const savedUser = getCurrentUser();
     if (savedUser) {
-        // Updated Role Logic
         if (savedUser.role === 'admin' || savedUser.email === 'Motivationbymirshod@gmail.com') {
              setUser(savedUser);
              setAppState(AppState.ADMIN);
@@ -82,23 +95,19 @@ function App() {
     }
   };
 
-  // NEW: Sync user data (credits/balance) from server
   const refreshUserData = async () => {
       if (!user?.email) return;
       try {
-          const res = await fetch(`http://localhost:5000/api/user/${user.email}`);
+          const res = await fetch(`${API_BASE_URL}/api/user/${user.email}`);
           if (res.ok) {
               const updatedUser = await res.json();
               setUser(updatedUser);
               saveUser(updatedUser);
           }
-      } catch (e) {
-          console.error("Failed to sync user data", e);
-      }
+      } catch (e) { console.error("Sync failed", e); }
   };
 
   const startExam = () => {
-    // ANALYTICS: Track Exam Start
     trackEvent('exam_start', { email: user?.email });
     setAppState(AppState.EXAM);
   };
@@ -106,12 +115,7 @@ function App() {
   const finishExam = async (transcript: string) => {
     setAppState(AppState.RESULTS);
     setIsLoadingResults(true);
-    
-    // ANALYTICS: Track Exam Completion (Crucial for retargeting "Test Takers")
-    trackEvent('exam_complete', { 
-        email: user?.email, 
-        transcript_length: transcript.length 
-    });
+    trackEvent('exam_complete', { email: user?.email, transcript_length: transcript.length });
 
     const processedTranscript = transcript.length > 20 
       ? transcript 
@@ -121,18 +125,14 @@ function App() {
       const result = await generateExamFeedback(processedTranscript, user?.targetLevel || '7.0');
       setExamResult(result);
       
-      // Save result to MongoDB API
       if (user && user.email) {
-          await fetch('http://localhost:5000/api/results', {
+          await fetch(`${API_BASE_URL}/api/results`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: user.email, result })
           });
-          
-          // REFRESH USER DATA IMMEDIATELY to update "examsLeft" count in UI
           await refreshUserData();
       }
-
     } catch (e) {
       console.error("Result generation failed", e);
       alert("Analysis failed. Please try again.");
@@ -145,95 +145,72 @@ function App() {
   const restart = () => {
     setExamResult(null);
     setAppState(AppState.DASHBOARD);
-    // Refresh again just in case
     refreshUserData();
   };
 
   const handleLogout = () => {
       setUser(null);
-      setAppState(AppState.LANDING);
+      // Return to AUTH on logout instead of LANDING
+      setAppState(AppState.AUTH);
   };
 
-  // Helper to get Icon for Theme
   const getThemeIcon = () => {
-      if (theme === 'light') return (
-          <svg className="w-5 h-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-      );
-      if (theme === 'dark') return (
-          <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-      );
-      return (
-          <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-      );
+      if (theme === 'light') return <svg className="w-5 h-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>;
+      if (theme === 'dark') return <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>;
+      return <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>;
   };
 
   return (
     <div className="font-sans">
-      {appState === AppState.LANDING && (
-          <Landing onStart={() => setAppState(AppState.AUTH)} />
-      )}
+      <Suspense fallback={<PageLoader />}>
+        {/* Render AUTH (Login/Signup) directly */}
+        {appState === AppState.AUTH && (
+          <Auth onLogin={handleLogin} />
+        )}
 
-      {appState === AppState.AUTH && (
-        <Auth onLogin={handleLogin} />
-      )}
+        {appState === AppState.ADMIN && (
+          <AdminPanel onLogout={handleLogout} />
+        )}
 
-      {appState === AppState.ADMIN && (
-        <AdminPanel onLogout={handleLogout} />
-      )}
-
-      {/* CONDITIONAL DASHBOARD RENDERING */}
-      {appState === AppState.DASHBOARD && user && (
-        user.role === 'teacher' ? (
-            <TeacherDashboard user={user} onLogout={handleLogout} />
-        ) : (
-            <Dashboard 
-              user={user} 
-              onStartExam={startExam} 
-              onLogout={handleLogout} 
-            />
-        )
-      )}
-
-      {appState === AppState.EXAM && user && (
-        <ExamRoom user={user} onFinish={finishExam} />
-      )}
-
-      {appState === AppState.RESULTS && (
-        <div className="min-h-screen bg-white dark:bg-slate-950 p-6 flex flex-col justify-center transition-colors duration-300">
-          {isLoadingResults ? (
-            <div className="flex flex-col items-center justify-center h-[80vh]">
-              <div className="relative w-24 h-24">
-                  <div className="absolute inset-0 border-t-4 border-cyan-500 border-solid rounded-full animate-spin"></div>
-                  <div className="absolute inset-2 border-b-4 border-purple-500 border-solid rounded-full animate-spin reverse"></div>
-              </div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white mt-8 tracking-wider animate-pulse">GENERATING REPORT</p>
-              <p className="text-sm text-cyan-600 dark:text-cyan-500/60 mt-2 font-mono">Comparing against Band {user?.targetLevel || '7.0'} standards...</p>
-              <div className="flex gap-2 mt-4">
-                  <span className="w-2 h-2 bg-slate-400 dark:bg-slate-600 rounded-full animate-bounce delay-75"></span>
-                  <span className="w-2 h-2 bg-slate-400 dark:bg-slate-600 rounded-full animate-bounce delay-150"></span>
-                  <span className="w-2 h-2 bg-slate-400 dark:bg-slate-600 rounded-full animate-bounce delay-300"></span>
-              </div>
-            </div>
+        {appState === AppState.DASHBOARD && user && (
+          user.role === 'teacher' ? (
+              <TeacherDashboard user={user} onLogout={handleLogout} />
           ) : (
-            <Results result={examResult} onRestart={restart} />
-          )}
-        </div>
-      )}
+              <Dashboard user={user} onStartExam={startExam} onLogout={handleLogout} />
+          )
+        )}
 
-      {/* FLOATING FEEDBACK WIDGET (Only when logged in and not in Admin) */}
-      {user && appState !== AppState.ADMIN && appState !== AppState.AUTH && appState !== AppState.LANDING && (
-          <FeedbackWidget user={user} />
-      )}
+        {appState === AppState.EXAM && user && (
+          <ExamRoom user={user} onFinish={finishExam} />
+        )}
 
-      {/* GLOBAL THEME SWITCHER FLOATING BUTTON */}
-      <button 
-        onClick={toggleTheme}
-        className="fixed bottom-4 left-4 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-full shadow-lg hover:scale-110 transition-transform"
-        title={`Current: ${theme.toUpperCase()}`}
-      >
+        {appState === AppState.RESULTS && (
+          <div className="min-h-screen bg-white dark:bg-slate-950 p-6 flex flex-col justify-center transition-colors duration-300">
+            {isLoadingResults ? (
+              <div className="flex flex-col items-center justify-center h-[80vh]">
+                <div className="relative w-24 h-24">
+                    <div className="absolute inset-0 border-t-4 border-cyan-500 border-solid rounded-full animate-spin"></div>
+                    <div className="absolute inset-2 border-b-4 border-purple-500 border-solid rounded-full animate-spin reverse"></div>
+                </div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-8 tracking-wider animate-pulse uppercase">Natija tahlil qilinmoqda</p>
+                <div className="mt-4 text-center max-w-lg">
+                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-2">Rasmiy IELTS kriteriyalari (Fluency, Lexical, Grammar, Pronunciation) bo'yicha tekshiruv.</p>
+                </div>
+              </div>
+            ) : (
+              <Results result={examResult} onRestart={restart} />
+            )}
+          </div>
+        )}
+
+        {user && appState !== AppState.ADMIN && appState !== AppState.AUTH && (
+            <FeedbackWidget user={user} />
+        )}
+      </Suspense>
+
+      <button onClick={toggleTheme} className="fixed bottom-4 left-4 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-full shadow-lg hover:scale-110 transition-transform">
           {getThemeIcon()}
       </button>
-
     </div>
   );
 }
