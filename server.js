@@ -1,3 +1,4 @@
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -26,12 +27,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Request Logger (Debugging uchun)
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // 1. Uploads papkasini statik qilish (Rasmlar/Cheklar uchun)
-// path.join ishlatish Renderda papkani to'g'ri topish uchun muhim
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 2. React Frontendni ulash (Build qilingan 'dist' papkasi)
-// Bu buyruq brauzerga css, js va rasmlarni yuboradi
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Configure Multer
@@ -61,6 +66,7 @@ if (!mongoUri) {
     .catch(err => console.error('❌ MongoDB connection error:', err.message));
 }
 
+// --- NODEMAILER CONFIG ---
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
@@ -70,17 +76,18 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS
   },
   tls: {
-    rejectUnauthorized: false // Helps avoid self-signed cert errors in some cloud envs
-  }
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 10000, // 10 seconds timeout
 });
 
-// Verify connection configuration on startup
+// Verify connection configuration (Non-blocking)
 if (process.env.EMAIL_USER) {
     transporter.verify(function (error, success) {
       if (error) {
-        console.log('⚠️ Email Server Error:', error.message);
+        console.warn('⚠️ Email Server Warning (may verify later):', error.message);
       } else {
-        console.log('✅ Email Server is ready to take messages');
+        console.log('✅ Email Server is ready');
       }
     });
 }
@@ -333,7 +340,12 @@ app.post('/api/user/send-verification-email', async (req, res) => {
         user.verificationToken = token;
         await user.save();
 
-        const verifyLink = `${process.env.BASE_URL || 'http://localhost:5000'}/api/verify-email?token=${token}`;
+        // DETERMINE BASE URL (Localhost vs Production)
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+        const host = req.headers.host;
+        const currentBaseUrl = process.env.BASE_URL || `${protocol}://${host}`;
+        
+        const verifyLink = `${currentBaseUrl}/api/verify-email?token=${token}`;
 
         // Send Email
         const mailOptions = {
@@ -704,6 +716,11 @@ async function sendTelegramMessage(text) {
     if (!token || !chatId) return;
     try { await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, { chat_id: chatId, text }); } catch (e) {}
 }
+
+// --- API ERROR HANDLER (Prevent HTML Responses for API Calls) ---
+app.use('/api/*', (req, res) => {
+    res.status(404).json({ message: `API Endpoint Not Found: ${req.method} ${req.url}` });
+});
 
 // --- CATCH-ALL ROUTE (MUST BE LAST) ---
 // Barcha boshqa so'rovlarni React appga yo'naltirish
