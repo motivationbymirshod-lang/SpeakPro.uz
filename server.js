@@ -61,18 +61,19 @@ if (!mongoUri) {
         .catch(err => console.error('❌ MongoDB connection error:', err.message));
 }
 
-// --- NODEMAILER CONFIG ---
+// --- NODEMAILER CONFIG (BREVO SMTP) ---
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        rejectUnauthorized: false // Helps avoid self-signed cert errors in some cloud envs
-    }
+  host: "smtp-relay.brevo.com", // Updated to Brevo
+  port: 587,
+  secure: false, // true for 465, false for other ports
+  auth: {
+    user: process.env.EMAIL_USER, // Brevo Login Email
+    pass: process.env.EMAIL_PASS  // Brevo SMTP Key (xsmtpsib-...)
+  },
+  tls: {
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 10000, // 10 seconds timeout
 });
 
 // Verify connection configuration on startup
