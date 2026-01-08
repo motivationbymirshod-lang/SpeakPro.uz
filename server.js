@@ -1,3 +1,4 @@
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -26,39 +27,43 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Request Logger (Debugging uchun)
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // 1. Uploads papkasini statik qilish (Rasmlar/Cheklar uchun)
-// path.join ishlatish Renderda papkani to'g'ri topish uchun muhim
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 2. React Frontendni ulash (Build qilingan 'dist' papkasi)
-// Bu buyruq brauzerga css, js va rasmlarni yuboradi
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Configure Multer
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const dir = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        cb(null, dir);
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname);
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(dir)){
+        fs.mkdirSync(dir, { recursive: true });
     }
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
 });
 const upload = multer({ storage: storage });
 
 const mongoUri = process.env.MONGODB_URI;
 if (!mongoUri) {
-    console.error('\x1b[31m%s\x1b[0m', '❌ XATOLIK: .env faylida "MONGODB_URI" topilmadi!');
+  console.error('\x1b[31m%s\x1b[0m', '❌ XATOLIK: .env faylida "MONGODB_URI" topilmadi!');
 } else {
-    mongoose.connect(mongoUri, {
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-    })
-        .then(() => console.log('✅ MongoDB connected successfully'))
-        .catch(err => console.error('❌ MongoDB connection error:', err.message));
+  mongoose.connect(mongoUri, {
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+  })
+    .then(() => console.log('✅ MongoDB connected successfully'))
+    .catch(err => console.error('❌ MongoDB connection error:', err.message));
 }
 
 // --- NODEMAILER CONFIG (BREVO SMTP) ---
@@ -76,14 +81,14 @@ const transporter = nodemailer.createTransport({
   connectionTimeout: 10000, // 10 seconds timeout
 });
 
-// Verify connection configuration on startup
+// Verify connection configuration (Non-blocking)
 if (process.env.EMAIL_USER) {
     transporter.verify(function (error, success) {
-        if (error) {
-            console.log('⚠️ Email Server Error:', error.message);
-        } else {
-            console.log('✅ Email Server is ready to take messages');
-        }
+      if (error) {
+        console.warn('⚠️ Email Server Warning (may verify later):', error.message);
+      } else {
+        console.log('✅ Email Server is ready (Brevo SMTP)');
+      }
     });
 }
 
@@ -93,62 +98,62 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // --- Schemas ---
 
 const userSchema = new mongoose.Schema({
-    firstName: String,
-    lastName: String,
-    phone: String,
-    email: { type: String, unique: true },
-    password: String,
-    googleId: String,
+  firstName: String,
+  lastName: String,
+  phone: String,
+  email: { type: String, unique: true },
+  password: String, 
+  googleId: String, 
+  
+  tempPassword: { type: String, default: null },
+  tempPasswordExpires: { type: Date, default: null },
+  
+  // EMAIL VERIFICATION
+  verificationToken: { type: String, default: null },
 
-    tempPassword: { type: String, default: null },
-    tempPasswordExpires: { type: Date, default: null },
+  currentLevel: String,
+  targetLevel: String,
+  joinedAt: { type: Date, default: Date.now },
+  lastSeen: { type: Date, default: Date.now }, 
+  role: { type: String, enum: ['student', 'teacher', 'admin'], default: 'student' },
+  teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, 
+  
+  // NEW FIELDS FOR TARIFF LOGIC
+  balance: { type: Number, default: 0 }, 
+  subscriptionPlan: { type: String, enum: ['free', 'pro', 'unlimited_teacher'], default: 'free' },
+  subscriptionExpiresAt: { type: Date },
+  examsLeft: { type: Number, default: 0 }, 
+  
+  hasUsedFreeTrial: { type: Boolean, default: false },
+  hasPaidHistory: { type: Boolean, default: false }, 
+  isEmailVerified: { type: Boolean, default: false }, 
 
-    // EMAIL VERIFICATION
-    verificationToken: { type: String, default: null },
-
-    currentLevel: String,
-    targetLevel: String,
-    joinedAt: { type: Date, default: Date.now },
-    lastSeen: { type: Date, default: Date.now },
-    role: { type: String, enum: ['student', 'teacher', 'admin'], default: 'student' },
-    teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-
-    // NEW FIELDS FOR TARIFF LOGIC
-    balance: { type: Number, default: 0 },
-    subscriptionPlan: { type: String, enum: ['free', 'pro', 'unlimited_teacher'], default: 'free' },
-    subscriptionExpiresAt: { type: Date },
-    examsLeft: { type: Number, default: 0 },
-
-    hasUsedFreeTrial: { type: Boolean, default: false },
-    hasPaidHistory: { type: Boolean, default: false },
-    isEmailVerified: { type: Boolean, default: false },
-
-    homework: {
-        text: String,
-        assignedAt: Date,
-        isCompleted: { type: Boolean, default: false }
-    }
+  homework: {
+      text: String,
+      assignedAt: Date,
+      isCompleted: { type: Boolean, default: false }
+  }
 });
 
 const examSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    date: { type: Date, default: Date.now },
-    overallBand: Number,
-    fluencyScore: Number,
-    lexicalScore: Number,
-    grammarScore: Number,
-    pronunciationScore: Number,
-    generalAdvice: String,
-    weaknessTags: [String],
-    weaknessCategories: {
-        fluency: String,
-        lexical: String,
-        grammar: String,
-        pronunciation: String
-    },
-    drills: [{ title: String, instruction: String, example: String }],
-    dailyPlan: [{ day: String, focusArea: String, activity: String }],
-    isLocked: { type: Boolean, default: false }
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  date: { type: Date, default: Date.now },
+  overallBand: Number,
+  fluencyScore: Number,
+  lexicalScore: Number,
+  grammarScore: Number,
+  pronunciationScore: Number,
+  generalAdvice: String, 
+  weaknessTags: [String],
+  weaknessCategories: {
+    fluency: String,
+    lexical: String,
+    grammar: String,
+    pronunciation: String
+  },
+  drills: [{ title: String, instruction: String, example: String }],
+  dailyPlan: [{ day: String, focusArea: String, activity: String }],
+  isLocked: { type: Boolean, default: false } 
 });
 
 const feedbackSchema = new mongoose.Schema({
@@ -156,7 +161,7 @@ const feedbackSchema = new mongoose.Schema({
     email: String,
     firstName: String,
     type: { type: String, enum: ['exam', 'general'], default: 'general' },
-    rating: Number,
+    rating: Number, 
     message: String,
     createdAt: { type: Date, default: Date.now }
 });
@@ -165,8 +170,8 @@ const paymentRequestSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     userEmail: String,
     amount: Number,
-    note: String,
-    receiptPath: String,
+    note: String, 
+    receiptPath: String, 
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
     date: { type: Date, default: Date.now }
 });
@@ -184,9 +189,9 @@ const updateLastSeen = async (req, res, next) => {
     const email = body.email || query.email;
 
     if (userId) {
-        try { await User.findByIdAndUpdate(userId, { lastSeen: new Date() }); } catch (e) { }
+        try { await User.findByIdAndUpdate(userId, { lastSeen: new Date() }); } catch(e) {}
     } else if (email) {
-        try { await User.findOneAndUpdate({ email }, { lastSeen: new Date() }); } catch (e) { }
+        try { await User.findOneAndUpdate({ email }, { lastSeen: new Date() }); } catch(e) {}
     }
     next();
 };
@@ -197,91 +202,91 @@ app.use(updateLastSeen);
 
 // 1. SIGNUP (Email/Pass)
 app.post('/api/signup', async (req, res) => {
-    try {
-        const { email, role } = req.body;
-        const existingUser = await User.findOne({ email });
-        if (existingUser) return res.status(400).json({ message: "Bu email band." });
+  try {
+    const { email, role } = req.body;
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ message: "Bu email band." });
 
-        const safeRole = role === 'teacher' ? 'teacher' : 'student';
+    const safeRole = role === 'teacher' ? 'teacher' : 'student';
 
-        const newUser = new User({
-            ...req.body,
-            role: safeRole,
-            balance: 0,
-            subscriptionPlan: 'free',
-            examsLeft: safeRole === 'teacher' ? 0 : 1,
-            hasUsedFreeTrial: false,
-            hasPaidHistory: false,
-            isEmailVerified: false,
-            lastSeen: new Date()
-        });
-        await newUser.save();
-
-        await sendTelegramMessage(`🚀 SIGNUP: ${req.body.firstName} (${req.body.email}) - Role: ${safeRole}`);
-        res.status(201).json(newUser);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+    const newUser = new User({
+        ...req.body,
+        role: safeRole,
+        balance: 0,
+        subscriptionPlan: 'free',
+        examsLeft: safeRole === 'teacher' ? 0 : 1, 
+        hasUsedFreeTrial: false,
+        hasPaidHistory: false, 
+        isEmailVerified: false,
+        lastSeen: new Date()
+    });
+    await newUser.save();
+    
+    await sendTelegramMessage(`🚀 SIGNUP: ${req.body.firstName} (${req.body.email}) - Role: ${safeRole}`);
+    res.status(201).json(newUser);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 // 2. LOGIN (Email/Pass)
 app.post('/api/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        if (email === 'Motivationbymirshod@gmail.com' && password === 'Motivationbymirshod') {
-            return res.json({
-                _id: 'admin',
-                firstName: 'Admin',
-                lastName: 'User',
-                email: email,
-                role: 'admin',
-                balance: 999999999
-            });
-        }
-
-        const user = await User.findOne({ email });
-        if (!user) return res.status(400).json({ message: "Email yoki parol xato." });
-
-        let isPasswordValid = user.password === password;
-        if (!isPasswordValid && user.tempPassword && user.tempPassword === password) {
-            if (new Date() < user.tempPasswordExpires) {
-                isPasswordValid = true;
-                user.tempPassword = null;
-                user.tempPasswordExpires = null;
-                await user.save();
-            } else {
-                return res.status(400).json({ message: "Vaqtinchalik parol muddati tugagan." });
-            }
-        }
-        if (!isPasswordValid) return res.status(400).json({ message: "Email yoki parol xato." });
-
-        if (user.subscriptionExpiresAt && new Date() > user.subscriptionExpiresAt) {
-            user.subscriptionPlan = 'free';
-        }
-
-        user.lastSeen = new Date();
-        await user.save();
-        res.json(user);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+  try {
+    const { email, password } = req.body;
+    
+    if (email === 'Motivationbymirshod@gmail.com' && password === 'Motivationbymirshod') {
+        return res.json({
+            _id: 'admin',
+            firstName: 'Admin',
+            lastName: 'User',
+            email: email,
+            role: 'admin',
+            balance: 999999999
+        });
     }
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: "Email yoki parol xato." });
+
+    let isPasswordValid = user.password === password;
+    if (!isPasswordValid && user.tempPassword && user.tempPassword === password) {
+        if (new Date() < user.tempPasswordExpires) {
+            isPasswordValid = true;
+            user.tempPassword = null;
+            user.tempPasswordExpires = null;
+            await user.save();
+        } else {
+            return res.status(400).json({ message: "Vaqtinchalik parol muddati tugagan." });
+        }
+    }
+    if (!isPasswordValid) return res.status(400).json({ message: "Email yoki parol xato." });
+    
+    if (user.subscriptionExpiresAt && new Date() > user.subscriptionExpiresAt) {
+        user.subscriptionPlan = 'free';
+    }
+
+    user.lastSeen = new Date();
+    await user.save();
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 // 3. GOOGLE LOGIN (REAL IMPLEMENTATION)
 app.post('/api/auth/google', async (req, res) => {
     try {
         const { token } = req.body;
-
+        
         // Verify Google Token
         const ticket = await client.verifyIdToken({
             idToken: token,
-            audience: process.env.GOOGLE_CLIENT_ID,
+            audience: process.env.GOOGLE_CLIENT_ID,  
         });
         const payload = ticket.getPayload();
-
+        
         const { email, given_name, family_name, sub } = payload;
-
+        
         let user = await User.findOne({ email });
 
         if (!user) {
@@ -326,16 +331,21 @@ app.post('/api/user/send-verification-email', async (req, res) => {
     try {
         const { userId } = req.body;
         const user = await User.findById(userId);
-        if (!user) return res.status(404).json({ message: "User not found" });
+        if(!user) return res.status(404).json({message: "User not found"});
 
-        if (user.isEmailVerified) return res.status(400).json({ message: "Allaqachon tasdiqlangan" });
+        if(user.isEmailVerified) return res.status(400).json({message: "Allaqachon tasdiqlangan"});
 
         // Generate Token
         const token = uuidv4();
         user.verificationToken = token;
         await user.save();
 
-        const verifyLink = `${process.env.BASE_URL || 'https://speakpro-uz.onrender.com'}/api/verify-email?token=${token}`;
+        // DETERMINE BASE URL (Localhost vs Production)
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+        const host = req.headers.host;
+        const currentBaseUrl = process.env.BASE_URL || `${protocol}://${host}`;
+        
+        const verifyLink = `${currentBaseUrl}/api/verify-email?token=${token}`;
 
         // Send Email
         const mailOptions = {
@@ -360,7 +370,7 @@ app.post('/api/user/send-verification-email', async (req, res) => {
             res.json({ success: true, message: "Email yuborildi (Dev mode: Check server logs)" });
         }
 
-    } catch (e) {
+    } catch(e) {
         console.error(e);
         res.status(500).json({ message: e.message });
     }
@@ -406,7 +416,7 @@ app.post('/api/forgot-password', async (req, res) => {
         const user = await User.findOne({ email });
         if (!user) return res.status(404).json({ success: false, message: "Bunday email topilmadi" });
 
-        const tempPass = Math.random().toString(36).slice(-8);
+        const tempPass = Math.random().toString(36).slice(-8); 
         user.tempPassword = tempPass;
         user.tempPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
         await user.save();
@@ -433,9 +443,9 @@ app.post('/api/forgot-password', async (req, res) => {
 // --- UPDATED PURCHASE LOGIC (Supports Self & Teacher Tariffs) ---
 app.post('/api/wallet/purchase-plan', async (req, res) => {
     try {
-        const { userId, planId, resultId } = req.body;
+        const { userId, planId, resultId } = req.body; 
         const user = await User.findById(userId);
-        if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user) return res.status(404).json({message: "User not found"});
 
         let cost = 0;
         let creditsToAdd = 0;
@@ -443,40 +453,40 @@ app.post('/api/wallet/purchase-plan', async (req, res) => {
         let isPro = false;
         let isUnlimitedTeacher = false;
 
-        switch (planId) {
+        switch(planId) {
             // SELF TARIFFS
             case 'unlock_result': cost = 3000; packageName = "Unlock Result"; break;
             case 'one_exam': cost = 9000; creditsToAdd = 1; packageName = "1 Exam"; break;
             case '5_exams': cost = 39000; creditsToAdd = 5; packageName = "5 Exams"; break;
             case 'pro_sub': cost = 49000; creditsToAdd = 20; isPro = true; packageName = "PRO (20 Exams)"; break;
-
+            
             // TEACHER TARIFFS
-            case 'teacher_starter':
-                cost = 150000;
-                creditsToAdd = 20;
-                packageName = "Teacher Starter (20)";
+            case 'teacher_starter': 
+                cost = 150000; 
+                creditsToAdd = 20; 
+                packageName = "Teacher Starter (20)"; 
                 break;
-            case 'teacher_active':
-                cost = 350000;
-                creditsToAdd = 50;
-                packageName = "Teacher Active (50)";
+            case 'teacher_active': 
+                cost = 350000; 
+                creditsToAdd = 50; 
+                packageName = "Teacher Active (50)"; 
                 break;
-            case 'teacher_pro':
-                cost = 600000;
-                creditsToAdd = 100;
-                packageName = "Teacher Pro (100)";
+            case 'teacher_pro': 
+                cost = 600000; 
+                creditsToAdd = 100; 
+                packageName = "Teacher Pro (100)"; 
                 break;
-            case 'teacher_unlimited':
-                cost = 2000000;
+            case 'teacher_unlimited': 
+                cost = 2000000; 
                 isUnlimitedTeacher = true;
-                packageName = "Teacher Unlimited (SaaS)";
+                packageName = "Teacher Unlimited (SaaS)"; 
                 break;
-
-            default: return res.status(400).json({ message: "Invalid plan" });
+            
+            default: return res.status(400).json({message: "Invalid plan"});
         }
 
         if (user.balance < cost) {
-            return res.status(400).json({ message: "Balans yetarli emas", success: false, required: cost });
+            return res.status(400).json({message: "Balans yetarli emas", success: false, required: cost});
         }
 
         user.balance -= cost;
@@ -492,7 +502,7 @@ app.post('/api/wallet/purchase-plan', async (req, res) => {
                 user.examsLeft = 10000;
             } else {
                 user.examsLeft = (user.examsLeft || 0) + creditsToAdd;
-
+                
                 if (isPro) {
                     user.subscriptionPlan = 'pro';
                     const expires = new Date();
@@ -500,7 +510,7 @@ app.post('/api/wallet/purchase-plan', async (req, res) => {
                     user.subscriptionExpiresAt = expires;
                 }
             }
-            user.hasPaidHistory = true;
+            user.hasPaidHistory = true; 
         }
 
         await user.save();
@@ -515,65 +525,65 @@ app.post('/api/wallet/purchase-plan', async (req, res) => {
 app.get('/api/user/:email', async (req, res) => {
     try {
         const user = await User.findOne({ email: req.params.email });
-        if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user) return res.status(404).json({message: "User not found"});
         user.lastSeen = new Date();
         await user.save();
         res.json(user);
-    } catch (e) { res.status(500).json({ message: e.message }); }
+    } catch (e) { res.status(500).json({message: e.message}); }
 });
 
 app.post('/api/results', async (req, res) => {
-    try {
-        const { email, result } = req.body;
-        const user = await User.findOne({ email });
-        if (!user) return res.status(404).json({ message: "User not found" });
+  try {
+    const { email, result } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-        await ExamResult.deleteMany({ userId: user._id });
+    await ExamResult.deleteMany({ userId: user._id });
+    
+    let shouldLock = false;
+    const isB2B = !!user.teacherId;
+    const isPro = user.subscriptionPlan === 'pro' || user.subscriptionPlan === 'unlimited_teacher';
+    const hasPaid = user.hasPaidHistory;
 
-        let shouldLock = false;
-        const isB2B = !!user.teacherId;
-        const isPro = user.subscriptionPlan === 'pro' || user.subscriptionPlan === 'unlimited_teacher';
-        const hasPaid = user.hasPaidHistory;
+    if (!isB2B && !isPro && !hasPaid) {
+        shouldLock = true;
+        user.hasUsedFreeTrial = true;
+    } 
 
-        if (!isB2B && !isPro && !hasPaid) {
-            shouldLock = true;
-            user.hasUsedFreeTrial = true;
-        }
-
-        if (user.examsLeft > 0) {
-            user.examsLeft -= 1;
+    if (user.examsLeft > 0) {
+        user.examsLeft -= 1;
+    } else {
+        if (!isPro && !hasPaid && !user.hasUsedFreeTrial) {
+             // Free trial logic
         } else {
-            if (!isPro && !hasPaid && !user.hasUsedFreeTrial) {
-                // Free trial logic
-            } else {
-                return res.status(403).json({ message: "No credits left" });
-            }
+             return res.status(403).json({ message: "No credits left" });
         }
-
-        user.lastSeen = new Date();
-        await user.save();
-
-        const newExam = new ExamResult({
-            userId: user._id,
-            overallBand: result.overallBand,
-            fluencyScore: result.fluency.score,
-            lexicalScore: result.lexical.score,
-            grammarScore: result.grammar.score,
-            pronunciationScore: result.pronunciation.score,
-            generalAdvice: result.generalAdvice,
-            weaknessTags: result.weaknessTags,
-            weaknessCategories: result.weaknessCategories,
-            drills: result.drills,
-            dailyPlan: result.dailyPlan,
-            isLocked: shouldLock
-        });
-
-        await newExam.save();
-        res.status(201).json(newExam);
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ message: "Failed to save result" });
     }
+
+    user.lastSeen = new Date();
+    await user.save();
+
+    const newExam = new ExamResult({
+        userId: user._id,
+        overallBand: result.overallBand,
+        fluencyScore: result.fluency.score,
+        lexicalScore: result.lexical.score,
+        grammarScore: result.grammar.score,
+        pronunciationScore: result.pronunciation.score,
+        generalAdvice: result.generalAdvice,
+        weaknessTags: result.weaknessTags,
+        weaknessCategories: result.weaknessCategories,
+        drills: result.drills,
+        dailyPlan: result.dailyPlan,
+        isLocked: shouldLock
+    });
+
+    await newExam.save();
+    res.status(201).json(newExam);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Failed to save result" });
+  }
 });
 
 app.get('/api/history', async (req, res) => {
@@ -609,7 +619,7 @@ app.delete('/api/admin/users/:id', async (req, res) => { try { await User.findBy
 app.get('/api/admin/stats', async (req, res) => { try { const totalUsers = await User.countDocuments(); const proUsers = await User.countDocuments({ subscriptionPlan: 'pro' }); const dailyActive = await User.countDocuments({ lastSeen: { $gte: new Date(Date.now() - 86400000) } }); res.json({ totalUsers, proUsers, dailyActive, avgScore: 6.5, activeHours: [] }); } catch (e) { res.status(500).json({ message: e.message }); } });
 app.get('/api/admin/feedbacks', async (req, res) => { try { const items = await Feedback.find().sort({ createdAt: -1 }).limit(50); res.json(items); } catch (e) { res.status(500).json({ message: e.message }); } });
 app.delete('/api/admin/feedbacks/:id', async (req, res) => { try { await Feedback.findByIdAndDelete(req.params.id); res.json({ success: true }); } catch (e) { res.status(500).json({ message: e.message }); } });
-app.post('/api/admin/update-user-wallet', async (req, res) => { try { const { userId, amount, plan, exams } = req.body; const user = await User.findById(userId); if (!user) return res.status(404).json({ message: "User not found" }); if (amount) user.balance = (user.balance || 0) + Number(amount); if (plan) user.subscriptionPlan = plan; if (exams !== undefined && exams !== '') user.examsLeft = Number(exams); await user.save(); res.json({ success: true }); } catch (e) { res.status(500).json({ message: e.message }); } });
+app.post('/api/admin/update-user-wallet', async (req, res) => { try { const { userId, amount, plan, exams } = req.body; const user = await User.findById(userId); if(!user) return res.status(404).json({message: "User not found"}); if(amount) user.balance = (user.balance || 0) + Number(amount); if(plan) user.subscriptionPlan = plan; if(exams !== undefined && exams !== '') user.examsLeft = Number(exams); await user.save(); res.json({ success: true }); } catch (e) { res.status(500).json({ message: e.message }); } });
 app.put('/api/admin/change-password', async (req, res) => { try { await User.findByIdAndUpdate(req.body.userId, { password: req.body.newPassword }); res.json({ success: true }); } catch (e) { res.status(500).json({ message: e.message }); } });
 
 // --- TEACHER ROUTES ---
@@ -629,21 +639,21 @@ app.post('/api/teacher/create-student', async (req, res) => {
     try {
         const { firstName, lastName, email, password, teacherId } = req.body;
         const exists = await User.findOne({ email });
-        if (exists) return res.status(400).json({ message: "Email already exists" });
-
-        const newStudent = new User({
-            firstName,
-            lastName,
-            email,
-            password,
-            teacherId,
-            role: 'student',
-            balance: 0,
-            subscriptionPlan: 'free',
-            examsLeft: 0,
+        if(exists) return res.status(400).json({ message: "Email already exists" });
+        
+        const newStudent = new User({ 
+            firstName, 
+            lastName, 
+            email, 
+            password, 
+            teacherId, 
+            role: 'student', 
+            balance: 0, 
+            subscriptionPlan: 'free', 
+            examsLeft: 0, 
             hasPaidHistory: false,
-            currentLevel: '5.0',
-            targetLevel: '6.5'
+            currentLevel: '5.0', 
+            targetLevel: '6.5' 
         });
         await newStudent.save(); res.json(newStudent);
     } catch (e) { res.status(500).json({ message: e.message }); }
@@ -657,11 +667,11 @@ app.post('/api/teacher/distribute-credit', async (req, res) => {
 
         let isUnlimited = teacher.subscriptionPlan === 'unlimited_teacher';
         if (isUnlimited && teacher.subscriptionExpiresAt && new Date() > teacher.subscriptionExpiresAt) {
-            isUnlimited = false;
-            teacher.subscriptionPlan = 'free';
+            isUnlimited = false; 
+            teacher.subscriptionPlan = 'free'; 
             await teacher.save();
         }
-
+        
         if (!isUnlimited && (!teacher.examsLeft || teacher.examsLeft <= 0)) {
             return res.status(400).json({ message: "Sizda kreditlar qolmagan. Iltimos paket sotib oling." });
         }
@@ -672,7 +682,7 @@ app.post('/api/teacher/distribute-credit', async (req, res) => {
         }
 
         student.examsLeft = (student.examsLeft || 0) + 1;
-        student.hasPaidHistory = true;
+        student.hasPaidHistory = true; 
         await student.save();
 
         res.json({ success: true, teacherRemaining: teacher.examsLeft, studentCredits: student.examsLeft });
@@ -704,13 +714,18 @@ async function sendTelegramMessage(text) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
     if (!token || !chatId) return;
-    try { await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, { chat_id: chatId, text }); } catch (e) { }
+    try { await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, { chat_id: chatId, text }); } catch (e) {}
 }
+
+// --- API ERROR HANDLER (Prevent HTML Responses for API Calls) ---
+app.use('/api/*', (req, res) => {
+    res.status(404).json({ message: `API Endpoint Not Found: ${req.method} ${req.url}` });
+});
 
 // --- CATCH-ALL ROUTE (MUST BE LAST) ---
 // Barcha boshqa so'rovlarni React appga yo'naltirish
 app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 const PORT = process.env.PORT || 5000;
