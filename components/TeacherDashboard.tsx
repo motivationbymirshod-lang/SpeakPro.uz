@@ -4,7 +4,7 @@ import { UserProfile, TeacherStudent } from '../types';
 import PaymentModal from './PaymentModal';
 import { logoutUser, saveUser } from '../utils/storageUtils';
 import { TEACHER_TARIFFS } from '../config/teacherTariffs';
-import { API_BASE_URL } from '../utils/api';
+import { API_BASE_URL } from '..src/config/api';
 
 interface TeacherDashboardProps {
   user: UserProfile;
