@@ -5,6 +5,7 @@ import { logoutUser, saveUser } from '../utils/storageUtils';
 import PaymentModal from './PaymentModal';
 import { SELF_TARIFFS } from '../config/selfTariffs';
 
+
 interface DashboardProps {
     user: UserProfile;
     onStartExam: () => void;
@@ -19,27 +20,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
     const [purchasing, setPurchasing] = useState(false);
     const [showStudentModal, setShowStudentModal] = useState(false); // Modal for B2B students
     const [verifyingEmail, setVerifyingEmail] = useState(false);
+    
+    // Settings & Password Change
+    const [showSettings, setShowSettings] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [isSavingPass, setIsSavingPass] = useState(false);
+
+    // EXTRACTED: Refresh logic to be called manually or on mount
+    const refreshUser = async () => {
+        try {
+            fetch('https://speakpro-uz.onrender.com/api/user/heartbeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email })
+            }).catch(() => { });
+
+            const res = await fetch(`https://speakpro-uz.onrender.com/api/user/${user.email}`);
+            if (res.ok) {
+                const updatedUser = await res.json();
+                setUser(updatedUser);
+                saveUser(updatedUser);
+            }
+        } catch (e) { console.error(e); }
+    };
 
     // Refresh user data (balance/plan) on mount AND Send Heartbeat
     useEffect(() => {
-        const refreshUser = async () => {
-            try {
-                fetch('https://speakpro-uz.onrender.com/api/user/heartbeat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: initialUser.email })
-                }).catch(() => { });
-
-                const res = await fetch(`https://speakpro-uz.onrender.com/api/user/${initialUser.email}`);
-                if (res.ok) {
-                    const updatedUser = await res.json();
-                    setUser(updatedUser);
-                    saveUser(updatedUser);
-                }
-            } catch (e) { }
-        };
         refreshUser();
-    }, [initialUser.email]);
+    }, []); // Only on mount
 
     useEffect(() => {
         const fetchHistory = async () => {
@@ -152,6 +160,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
         finally { setPurchasing(false); }
     };
 
+    // CHANGE PASSWORD HANDLER
+    const handleUpdatePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(newPassword.length < 6) {
+            alert("Parol kamida 6 belgidan iborat bo'lishi kerak");
+            return;
+        }
+        setIsSavingPass(true);
+        try {
+            const res = await fetch('https://speakpro-uz.onrender.com/api/user/update-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user._id || user.id, newPassword })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert("Parol muvaffaqiyatli yangilandi!");
+                setNewPassword('');
+                setShowSettings(false);
+            } else {
+                alert(data.message);
+            }
+        } catch (e) { alert("Xatolik yuz berdi"); }
+        finally { setIsSavingPass(false); }
+    };
+
     const isPro = user.subscriptionPlan === 'pro';
     const lastExam = history.length > 0 ? history[0] : null;
     const isManagedStudent = !!user.teacherId;
@@ -188,6 +222,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                             </div>
                         )}
 
+                        <button 
+                            onClick={() => setShowSettings(true)}
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400"
+                            title="Sozlamalar & Parol"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        </button>
+
                         <button onClick={handleLogout} className="text-xs font-bold text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors border border-slate-200 dark:border-slate-800 px-5 py-3 rounded-xl hover:border-red-500/50 hover:bg-slate-100 dark:hover:bg-slate-900">
                             CHIQISH
                         </button>
@@ -217,13 +259,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                 <p className="text-xs text-red-400">Bepul imtihonni ishlatish uchun emailingiz tasdiqlangan bo'lishi shart.</p>
                             </div>
                         </div>
-                        <button
-                            onClick={handleVerifyEmail}
-                            disabled={verifyingEmail}
-                            className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-full text-sm font-bold"
-                        >
-                            {verifyingEmail ? 'Yuborilmoqda...' : 'Tasdiqlash linkini yuborish'}
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleVerifyEmail}
+                                disabled={verifyingEmail}
+                                className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-full text-sm font-bold"
+                            >
+                                {verifyingEmail ? 'Yuborilmoqda...' : 'Link yuborish'}
+                            </button>
+                            {/* NEW: Refresh button to manually check if user clicked the link in email */}
+                            <button
+                                onClick={refreshUser}
+                                className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-4 py-2 rounded-full text-sm font-bold"
+                                title="Agar emailni tasdiqlab bo'lgan bo'lsangiz bosing"
+                            >
+                                Tekshirish ⟳
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -482,6 +534,50 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                 Sizda faol imtihonlar mavjud emas. Iltimos, davom ettirish uchun o'qituvchingizga murojaat qiling.
                             </p>
                             <button onClick={() => setShowStudentModal(false)} className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold">Tushunarli</button>
+                        </div>
+                    </div>
+                )}
+
+                {/* SETTINGS / CHANGE PASSWORD MODAL */}
+                {showSettings && (
+                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm p-4 animate-fade-in">
+                        <div className="glass-card bg-white dark:bg-slate-900 w-full max-w-md p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Profil Sozlamalari</h3>
+                                <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white">✕</button>
+                            </div>
+                            
+                            <div className="mb-6">
+                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Foydalanuvchi</p>
+                                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold">
+                                        {user.firstName[0]}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-slate-900 dark:text-white">{user.firstName} {user.lastName}</div>
+                                        <div className="text-xs text-slate-500">{user.email}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleUpdatePassword}>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Yangi Parol</label>
+                                <input 
+                                    type="password" 
+                                    required
+                                    placeholder="Yangi parol kiriting..." 
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all mb-6"
+                                />
+                                <button 
+                                    type="submit" 
+                                    disabled={isSavingPass}
+                                    className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                                >
+                                    {isSavingPass ? 'Saqlanmoqda...' : 'Parolni Yangilash'}
+                                </button>
+                            </form>
                         </div>
                     </div>
                 )}
