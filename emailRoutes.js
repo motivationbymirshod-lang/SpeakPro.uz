@@ -4,27 +4,30 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const setupEmailRoutes = (app, User) => {
     // --- NODEMAILER CONFIG (BREVO SMTP) ---
+    // Render va boshqa cloudlar 587 portni bloklaydi. 
+    // Shuning uchun 465 (SSL) portidan foydalanamiz.
     const transporter = nodemailer.createTransport({
         host: "smtp-relay.brevo.com",
-        port: 587,
-        secure: false,
+        port: 465, // 587 o'rniga 465
+        secure: true, // 465 uchun true bo'lishi shart
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
         },
         tls: {
-            rejectUnauthorized: false
+            // Self-signed sertifikatlar bilan bog'liq muammolarni oldini olish
+            rejectUnauthorized: false 
         },
-        connectionTimeout: 10000,
+        connectionTimeout: 10000, // 10 soniya kutish
     });
 
     // Verify connection configuration (Non-blocking)
     if (process.env.EMAIL_USER) {
         transporter.verify(function (error, success) {
             if (error) {
-                console.warn('⚠️ Email Server Warning (may verify later):', error.message);
+                console.error('❌ Email Server Error:', error);
             } else {
-                console.log('✅ Email Server is ready (Brevo SMTP)');
+                console.log('✅ Email Server is ready (Brevo SMTP via Port 465)');
             }
         });
     }
@@ -74,7 +77,7 @@ export const setupEmailRoutes = (app, User) => {
             }
 
         } catch (e) {
-            console.error(e);
+            console.error("Email send error:", e);
             res.status(500).json({ message: e.message });
         }
     });
@@ -108,6 +111,7 @@ export const setupEmailRoutes = (app, User) => {
         `);
 
         } catch (e) {
+            console.error(e);
             res.status(500).send("Server xatosi");
         }
     });
@@ -139,6 +143,7 @@ export const setupEmailRoutes = (app, User) => {
 
             res.json({ success: true, message: `${email} ga vaqtinchalik parol yuborildi.` });
         } catch (e) {
+            console.error("Forgot pass error:", e);
             res.status(500).json({ message: e.message });
         }
     });
