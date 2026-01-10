@@ -97,10 +97,33 @@ function App() {
     }
   };
 
-  const startExam = () => {
-    // ANALYTICS: Track Exam Start
-    trackEvent('exam_start', { email: user?.email });
-    setAppState(AppState.EXAM);
+  const startExam = async () => {
+    if(!user) return;
+    
+    // Deduct credit immediately via API
+    try {
+        const res = await fetch('https://speakpro-uz.onrender.com/api/exam/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user._id || user.id })
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            // Update local user state with new credit count
+            const updatedUser = { ...user, examsLeft: data.examsLeft };
+            setUser(updatedUser);
+            saveUser(updatedUser);
+            
+            // ANALYTICS: Track Exam Start
+            trackEvent('exam_start', { email: user?.email });
+            setAppState(AppState.EXAM);
+        } else {
+            alert(data.message || "Xatolik yuz berdi. Imtihon boshlanmadi.");
+        }
+    } catch (e) {
+        alert("Server bilan aloqa yo'q. Internetni tekshiring.");
+    }
   };
 
   const finishExam = async (transcript: string) => {
@@ -129,7 +152,7 @@ function App() {
           body: JSON.stringify({ email: user.email, result })
         });
 
-        // REFRESH USER DATA IMMEDIATELY to update "examsLeft" count in UI
+        // REFRESH USER DATA IMMEDIATELY to update any status changes
         await refreshUserData();
       }
 
