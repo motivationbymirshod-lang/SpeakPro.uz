@@ -441,6 +441,41 @@ app.post('/api/wallet/purchase-plan', async (req, res) => {
     }
 });
 
+// --- NEW: START EXAM (DEDUCT CREDIT) ---
+app.post('/api/exam/start', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        // Logic: Deduct credit OR Mark Free Trial as used
+        const isUnlimited = user.subscriptionPlan === 'unlimited_teacher' || user.subscriptionPlan === 'pro';
+        
+        if (isUnlimited) {
+            // Unlimited plans don't consume credits (or consume but have plenty)
+            // Just update last seen
+        } else {
+            if (user.examsLeft > 0) {
+                user.examsLeft -= 1;
+            } else {
+                // Check if it's the free trial
+                if (!user.hasPaidHistory && !user.hasUsedFreeTrial) {
+                    user.hasUsedFreeTrial = true; // Mark as started/used
+                } else {
+                    return res.status(403).json({ message: "Sizda imtihon qolmadi. Balansni to'ldiring." });
+                }
+            }
+        }
+
+        user.lastSeen = new Date();
+        await user.save();
+        res.json({ success: true, examsLeft: user.examsLeft });
+
+    } catch (e) {
+        res.status(500).json({ message: e.message });
+    }
+});
+
 app.get('/api/user/:email', async (req, res) => {
     try {
         const user = await User.findOne({ email: req.params.email });
@@ -457,30 +492,24 @@ app.post('/api/results', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    await ExamResult.deleteMany({ userId: user._id });
+    // Note: Credit deduction now happens at /api/exam/start
     
+    // Result Locking Logic
     let shouldLock = false;
     const isB2B = !!user.teacherId;
     const isPro = user.subscriptionPlan === 'pro' || user.subscriptionPlan === 'unlimited_teacher';
     const hasPaid = user.hasPaidHistory;
 
+    // If student is free and hasn't paid before (e.g. using free trial or gifted credit without payment history)
+    // Note: If they paid for a package, hasPaidHistory is true, so they see full results.
     if (!isB2B && !isPro && !hasPaid) {
         shouldLock = true;
-        user.hasUsedFreeTrial = true;
     } 
-
-    if (user.examsLeft > 0) {
-        user.examsLeft -= 1;
-    } else {
-        if (!isPro && !hasPaid && !user.hasUsedFreeTrial) {
-             // Free trial logic
-        } else {
-             return res.status(403).json({ message: "No credits left" });
-        }
-    }
 
     user.lastSeen = new Date();
     await user.save();
+
+    await ExamResult.deleteMany({ userId: user._id }); // Keep only last result for now per logic
 
     const newExam = new ExamResult({
         userId: user._id,
