@@ -267,9 +267,8 @@ app.post('/api/login', async (req, res) => {
     if (!isPasswordValid && user.tempPassword && user.tempPassword === password) {
         if (new Date() < user.tempPasswordExpires) {
             isPasswordValid = true;
-            user.tempPassword = null;
-            user.tempPasswordExpires = null;
-            await user.save();
+            // Temp password is valid, allow login.
+            // We DO NOT clear it here immediately, so user can use it to change password in settings.
         } else {
             return res.status(400).json({ message: "Vaqtinchalik parol muddati tugagan." });
         }
@@ -338,6 +337,25 @@ app.post('/api/auth/google', async (req, res) => {
     } catch (e) {
         console.error("Google Auth Error:", e);
         res.status(401).json({ message: "Google token noto'g'ri." });
+    }
+});
+
+// --- USER SELF PASSWORD UPDATE ---
+app.post('/api/user/update-password', async (req, res) => {
+    try {
+        const { userId, newPassword } = req.body;
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ message: "User topilmadi" });
+
+        user.password = newPassword;
+        // Agar vaqtinchalik parol ishlatilgan bo'lsa, uni o'chiramiz
+        user.tempPassword = null;
+        user.tempPasswordExpires = null;
+        
+        await user.save();
+        res.json({ success: true, message: "Parol muvaffaqiyatli o'zgartirildi" });
+    } catch (e) {
+        res.status(500).json({ message: e.message });
     }
 });
 
