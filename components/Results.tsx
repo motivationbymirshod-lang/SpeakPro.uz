@@ -34,7 +34,7 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
     };
 
     const unlockResultDirectly = async () => {
-        if (!window.confirm("5,000 so'm evaziga natijani ochishni tasdiqlaysizmi?")) return;
+        if (!window.confirm("3,000 so'm evaziga natijani ochishni tasdiqlaysizmi?")) return;
         setUnlocking(true);
         try {
             const res = await fetch('https://speakpro-uz.onrender.com/api/wallet/purchase-plan', {
@@ -49,7 +49,6 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
             const data = await res.json();
             if (res.ok) {
                 // Update local state and reload to remove lock
-                // In real app, we'd update `result` prop, but reloading is safer for quick fix
                 alert("Muvaffaqiyatli ochildi!");
                 window.location.reload();
             } else {
@@ -128,19 +127,21 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
                 {/* Radar Chart Analysis (LOCKED IF FREE EXAM) */}
                 <div className="lg:col-span-2 glass-card p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 relative overflow-hidden">
                     {isLocked && (
-                        <div className="absolute inset-0 z-20 backdrop-blur-md bg-white/50 dark:bg-black/60 flex flex-col items-center justify-center">
-                            <div className="text-4xl mb-4">🔒</div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Unlock Full Report</h3>
-                            <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 text-center max-w-md">Get your Fluency, Vocabulary, Grammar, and Pronunciation scores.</p>
-                            <button onClick={handleUnlockClick} className="bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold py-3 px-8 rounded-full shadow-xl hover:scale-105 transition-transform flex items-center gap-2">
-                                <span>Unlock for 5,000 UZS</span>
-                            </button>
+                        <div className="absolute inset-0 z-20 backdrop-blur-sm bg-white/60 dark:bg-black/80 flex flex-col items-center justify-center">
+                            <div className="bg-slate-900/90 p-6 rounded-2xl text-center max-w-sm shadow-2xl border border-slate-700">
+                                <div className="text-4xl mb-3">🔒</div>
+                                <h3 className="text-xl font-bold text-white mb-2">To'liq hisobotni oching</h3>
+                                <p className="text-sm text-slate-300 mb-6">Fluency, Grammar va Pronunciation bo'yicha aniq ballaringizni biling.</p>
+                                <button onClick={handleUnlockClick} className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold py-3 px-8 rounded-full shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2 w-full">
+                                    <span>Ochish (3,000 UZS)</span>
+                                </button>
+                            </div>
                         </div>
                     )}
 
                     <h3 className="text-sm text-slate-500 dark:text-slate-400 uppercase mb-2 pl-4">Skill Breakdown (Radar View)</h3>
 
-                    <div className={`h-64 w-full transition-all duration-300 ${isLocked ? 'blur-sm' : ''}`}>
+                    <div className={`h-64 w-full transition-all duration-300 ${isLocked ? 'blur-md opacity-50' : ''}`}>
                         <ResponsiveContainer width="100%" height="100%">
                             <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
                                 <PolarGrid stroke="#94a3b8" />
@@ -157,9 +158,7 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
             <div className={`grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 transition-all relative ${isLocked ? 'pointer-events-none select-none' : ''}`}>
                 {isLocked && (
                     <div className="absolute inset-0 z-20 backdrop-blur-sm bg-white/10 dark:bg-black/20 rounded-2xl flex items-center justify-center border border-white/20">
-                        <div className="bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-2">
-                            <span>🔒</span> Detailed Scores Hidden
-                        </div>
+                        {/* Hidden to emphasize the main unlock button above, but prevents clicks */}
                     </div>
                 )}
                 {[
@@ -168,7 +167,7 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
                     { title: 'Grammar', data: result.grammar, color: 'text-blue-600 dark:text-blue-400', border: 'border-blue-500/30' },
                     { title: 'Pronunciation', data: result.pronunciation, color: 'text-purple-600 dark:text-purple-400', border: 'border-purple-500/30' },
                 ].map((item, idx) => (
-                    <div key={idx} className={`bg-white dark:bg-slate-900 p-5 rounded-xl border ${item.border} hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm ${isLocked ? 'blur-[3px]' : ''}`}>
+                    <div key={idx} className={`bg-white dark:bg-slate-900 p-5 rounded-xl border ${item.border} hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm ${isLocked ? 'blur-[4px]' : ''}`}>
                         <div className="flex justify-between items-end mb-2">
                             <h4 className="font-bold text-slate-700 dark:text-slate-300">{item.title}</h4>
                             <span className={`text-2xl font-bold ${item.color}`}>{item.data.score}</span>
