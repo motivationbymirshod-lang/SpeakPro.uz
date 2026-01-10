@@ -10,9 +10,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import nodemailer from 'nodemailer';
 import { OAuth2Client } from 'google-auth-library';
 import { v4 as uuidv4 } from 'uuid';
+import { setupEmailRoutes } from './emailRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -33,7 +33,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// 1. Uploads papkasini statik qilish (Rasmlar/Cheklar uchun)
+// 1. Uploads papkasini statik qilish (Vaqtinchalik saqlash uchun)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 2. React Frontendni ulash (Build qilingan 'dist' papkasi)
@@ -64,32 +64,6 @@ if (!mongoUri) {
   })
     .then(() => console.log('✅ MongoDB connected successfully'))
     .catch(err => console.error('❌ MongoDB connection error:', err.message));
-}
-
-// --- NODEMAILER CONFIG (BREVO SMTP) ---
-const transporter = nodemailer.createTransport({
-  host: "smtp-relay.brevo.com", // Updated to Brevo
-  port: 587,
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: process.env.EMAIL_USER, // Brevo Login Email
-    pass: process.env.EMAIL_PASS  // Brevo SMTP Key (xsmtpsib-...)
-  },
-  tls: {
-    rejectUnauthorized: false
-  },
-  connectionTimeout: 10000, // 10 seconds timeout
-});
-
-// Verify connection configuration (Non-blocking)
-if (process.env.EMAIL_USER) {
-    transporter.verify(function (error, success) {
-      if (error) {
-        console.warn('⚠️ Email Server Warning (may verify later):', error.message);
-      } else {
-        console.log('✅ Email Server is ready (Brevo SMTP)');
-      }
-    });
 }
 
 // --- GOOGLE AUTH CLIENT ---
@@ -171,7 +145,7 @@ const paymentRequestSchema = new mongoose.Schema({
     userEmail: String,
     amount: Number,
     note: String, 
-    receiptPath: String, 
+    receiptPath: String, // Kept for legacy support, but will mostly be null/telegram-ref
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
     date: { type: Date, default: Date.now }
 });
@@ -180,6 +154,9 @@ const User = mongoose.model('User', userSchema);
 const ExamResult = mongoose.model('ExamResult', examSchema);
 const Feedback = mongoose.model('Feedback', feedbackSchema);
 const PaymentRequest = mongoose.model('PaymentRequest', paymentRequestSchema);
+
+// --- SETUP EMAIL ROUTES ---
+setupEmailRoutes(app, User);
 
 // --- Middleware ---
 const updateLastSeen = async (req, res, next) => {
@@ -197,6 +174,44 @@ const updateLastSeen = async (req, res, next) => {
 };
 
 app.use(updateLastSeen);
+
+// --- HELPER: SEND TELEGRAM PHOTO/DOC ---
+async function sendTelegramFile(filePath, caption) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return false;
+
+    try {
+        // Native Node 18+ fetch with FormData
+        const formData = new FormData();
+        formData.append('chat_id', chatId);
+        formData.append('caption', caption);
+        
+        // Read file as Blob/File compatible stream
+        const fileBuffer = fs.readFileSync(filePath);
+        const blob = new Blob([fileBuffer]); 
+        formData.append('document', blob, path.basename(filePath));
+
+        const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        return res.ok;
+    } catch (e) {
+        console.error("Telegram send error:", e.message);
+        // Fallback: Just send text
+        await sendTelegramMessage(`${caption}\n\n(File sending failed, check server logs)`);
+        return false;
+    }
+}
+
+async function sendTelegramMessage(text) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    if (!token || !chatId) return;
+    try { await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, { chat_id: chatId, text }); } catch (e) {}
+}
 
 // --- Routes ---
 
@@ -323,120 +338,6 @@ app.post('/api/auth/google', async (req, res) => {
     } catch (e) {
         console.error("Google Auth Error:", e);
         res.status(401).json({ message: "Google token noto'g'ri." });
-    }
-});
-
-// 4. SEND VERIFICATION EMAIL
-app.post('/api/user/send-verification-email', async (req, res) => {
-    try {
-        const { userId } = req.body;
-        const user = await User.findById(userId);
-        if(!user) return res.status(404).json({message: "User not found"});
-
-        if(user.isEmailVerified) return res.status(400).json({message: "Allaqachon tasdiqlangan"});
-
-        // Generate Token
-        const token = uuidv4();
-        user.verificationToken = token;
-        await user.save();
-
-        // DETERMINE BASE URL (Localhost vs Production)
-        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-        const host = req.headers.host;
-        const currentBaseUrl = process.env.BASE_URL || `${protocol}://${host}`;
-        
-        const verifyLink = `${currentBaseUrl}/api/verify-email?token=${token}`;
-
-        // Send Email
-        const mailOptions = {
-            from: `"SpeakPro AI" <${process.env.EMAIL_USER}>`,
-            to: user.email,
-            subject: 'Emailingizni tasdiqlang',
-            html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
-                    <h2>SpeakPro AI ga xush kelibsiz!</h2>
-                    <p>Bepul imtihonni ishga tushirish uchun pastdagi tugmani bosing:</p>
-                    <a href="${verifyLink}" style="background-color: #06b6d4; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin-top: 10px;">Tasdiqlash</a>
-                    <p style="margin-top: 20px; color: #666; font-size: 12px;">Agar siz ro'yxatdan o'tmagan bo'lsangiz, bu xabarni e'tiborsiz qoldiring.</p>
-                </div>
-            `
-        };
-
-        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-            await transporter.sendMail(mailOptions);
-            res.json({ success: true, message: "Email yuborildi" });
-        } else {
-            console.log("⚠️ SMTP sozlanmagan. Link terminalda:", verifyLink);
-            res.json({ success: true, message: "Email yuborildi (Dev mode: Check server logs)" });
-        }
-
-    } catch(e) {
-        console.error(e);
-        res.status(500).json({ message: e.message });
-    }
-});
-
-// 5. HANDLE VERIFICATION CLICK (GET request from Email)
-app.get('/api/verify-email', async (req, res) => {
-    try {
-        const { token } = req.query;
-        if (!token) return res.send("Xato havola");
-
-        const user = await User.findOne({ verificationToken: token });
-        if (!user) return res.send("Havola eskirgan yoki noto'g'ri.");
-
-        user.isEmailVerified = true;
-        user.verificationToken = null; // Clear token
-        await user.save();
-
-        res.send(`
-            <html>
-                <body style="background-color: #0f172a; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
-                    <div style="text-align: center;">
-                        <h1 style="color: #22d3ee;">Email Tasdiqlandi! ✅</h1>
-                        <p>Endi SpeakPro saytiga qaytib, bepul imtihonni boshlashingiz mumkin.</p>
-                        <p style="font-size: 12px; color: #94a3b8;">(Sahifani yangilang)</p>
-                        <script>
-                           setTimeout(() => { window.close(); }, 3000);
-                        </script>
-                    </div>
-                </body>
-            </html>
-        `);
-
-    } catch (e) {
-        res.status(500).send("Server xatosi");
-    }
-});
-
-// 6. FORGOT PASSWORD (Send Temp Pass)
-app.post('/api/forgot-password', async (req, res) => {
-    try {
-        const { email } = req.body;
-        const user = await User.findOne({ email });
-        if (!user) return res.status(404).json({ success: false, message: "Bunday email topilmadi" });
-
-        const tempPass = Math.random().toString(36).slice(-8); 
-        user.tempPassword = tempPass;
-        user.tempPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
-        await user.save();
-
-        const mailOptions = {
-            from: `"SpeakPro Support" <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: 'Parolni tiklash',
-            text: `Sizning vaqtinchalik parolingiz: ${tempPass}\nBu parol 1 soat davomida amal qiladi.`
-        };
-
-        if (process.env.EMAIL_USER) {
-            await transporter.sendMail(mailOptions);
-        } else {
-            console.log("Dev Temp Pass:", tempPass);
-        }
-
-        res.json({ success: true, message: `${email} ga vaqtinchalik parol yuborildi.` });
-    } catch (e) {
-        res.status(500).json({ message: e.message });
     }
 });
 
@@ -699,23 +600,47 @@ app.post('/api/teacher/assign-homework', async (req, res) => {
 
 app.post('/api/feedback', async (req, res) => { try { const fb = new Feedback(req.body); await fb.save(); res.json({ success: true }); } catch (e) { res.status(500).json({ message: e.message }); } });
 app.post('/api/user/heartbeat', async (req, res) => { try { await User.findOneAndUpdate({ email: req.body.email }, { lastSeen: new Date() }); res.json({ success: true }); } catch (e) { res.status(500).json({ message: e.message }); } });
+
+// --- MANUAL PAYMENT: Send to Telegram & Delete Local File (Option B) ---
 app.post('/api/wallet/request-manual-payment', upload.single('receipt'), async (req, res) => {
     try {
         const { userId, amount, note } = req.body;
         const user = await User.findById(userId);
-        const request = new PaymentRequest({ userId, userEmail: user.email, amount: Number(amount), note, receiptPath: req.file ? req.file.path : null, status: 'pending' });
-        await request.save();
-        await sendTelegramMessage(`💸 PAY REQUEST: ${user.email} - ${amount}`);
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ message: e.message }); }
-});
+        
+        const caption = `💸 PAY REQUEST\nUser: ${user.email}\nAmount: ${amount}\nNote: ${note}`;
+        let telegramSent = false;
 
-async function sendTelegramMessage(text) {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return;
-    try { await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, { chat_id: chatId, text }); } catch (e) {}
-}
+        // If file exists, send to Telegram
+        if (req.file) {
+            telegramSent = await sendTelegramFile(req.file.path, caption);
+            // DELETE FILE AFTER SENDING (Save Space)
+            try {
+                fs.unlinkSync(req.file.path);
+            } catch (err) {
+                console.error("Failed to delete temp file:", err);
+            }
+        } else {
+            // Text only
+            await sendTelegramMessage(caption);
+            telegramSent = true;
+        }
+
+        // Save Request to DB (without file path, as it's now in Telegram)
+        const request = new PaymentRequest({ 
+            userId, 
+            userEmail: user.email, 
+            amount: Number(amount), 
+            note, 
+            receiptPath: telegramSent ? "Sent to Telegram" : "Failed", 
+            status: 'pending' 
+        });
+        await request.save();
+        
+        res.json({ success: true });
+    } catch (e) { 
+        res.status(500).json({ message: e.message }); 
+    }
+});
 
 // --- API ERROR HANDLER (Prevent HTML Responses for API Calls) ---
 app.use('/api/*', (req, res) => {
