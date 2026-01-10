@@ -4,21 +4,20 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const setupEmailRoutes = (app, User) => {
     // --- NODEMAILER CONFIG (BREVO SMTP) ---
-    // Render va boshqa cloudlar 587 portni bloklaydi. 
-    // Shuning uchun 465 (SSL) portidan foydalanamiz.
+    // Render 587 va 465 portlarini bloklashi mumkin.
+    // Brevo (Sendinblue) 2525 portini muqobil sifatida qo'llab-quvvatlaydi.
     const transporter = nodemailer.createTransport({
         host: "smtp-relay.brevo.com",
-        port: 465, // 587 o'rniga 465
-        secure: true, // 465 uchun true bo'lishi shart
+        port: 2525, // 587 o'rniga 2525 (Muqobil port)
+        secure: false, // 2525 uchun FALSE bo'lishi shart (u STARTTLS ishlatadi)
         auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
+            user: process.env.EMAIL_USER, // Brevo Login Email
+            pass: process.env.EMAIL_PASS  // Brevo SMTP KEY (API Key emas!)
         },
         tls: {
-            // Self-signed sertifikatlar bilan bog'liq muammolarni oldini olish
-            rejectUnauthorized: false 
+            rejectUnauthorized: false
         },
-        connectionTimeout: 10000, // 10 soniya kutish
+        connectionTimeout: 10000, 
     });
 
     // Verify connection configuration (Non-blocking)
@@ -27,7 +26,7 @@ export const setupEmailRoutes = (app, User) => {
             if (error) {
                 console.error('❌ Email Server Error:', error);
             } else {
-                console.log('✅ Email Server is ready (Brevo SMTP via Port 465)');
+                console.log('✅ Email Server is ready (Brevo SMTP via Port 2525)');
             }
         });
     }
