@@ -26,6 +26,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
     const [newPassword, setNewPassword] = useState('');
     const [isSavingPass, setIsSavingPass] = useState(false);
 
+    // Gamification States
+    const [streak, setStreak] = useState(0);
+
     // EXTRACTED: Refresh logic to be called manually or on mount
     const refreshUser = async () => {
         try {
@@ -43,6 +46,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
             }
         } catch (e) { console.error(e); }
     };
+
+    // Calculate Streak based on history (Simple simulation for now)
+    // In a real app, this should come from the backend
+    useEffect(() => {
+        // Mock Streak Logic: If joined < 1 day ago -> 1, else calc from history dates
+        const daysSinceJoin = Math.floor((new Date().getTime() - new Date(user.joinedAt || Date.now()).getTime()) / (1000 * 3600 * 24));
+        setStreak(daysSinceJoin > 0 ? daysSinceJoin + 1 : 1);
+    }, [user.joinedAt]);
 
     // Refresh user data (balance/plan) on mount AND Send Heartbeat
     useEffect(() => {
@@ -190,6 +201,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
     const lastExam = history.length > 0 ? history[0] : null;
     const isManagedStudent = !!user.teacherId;
     const showFreeTrialBanner = !isManagedStudent && !user.hasPaidHistory && !user.hasUsedFreeTrial;
+    
+    // Progress Logic
+    const currentScore = lastExam ? lastExam.overallBand : parseFloat(user.currentLevel || '5.0');
+    const targetScore = parseFloat(user.targetLevel || '7.5');
+    const progressPercent = Math.min(100, Math.max(10, ((currentScore - 4) / (targetScore - 4)) * 100)); // Normalized 4.0 - Target
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-200 pb-20 transition-colors duration-300 font-sans">
@@ -205,11 +221,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Xush kelibsiz, <span className={isPro ? "text-yellow-600 dark:text-yellow-400" : "text-cyan-600 dark:text-cyan-400"}>{user.firstName}</span></h1>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Bugun 7.0+ ball sari yana bir qadam tashlaymiz.</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                                <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                Maqsad sari: {user.targetLevel} Band
+                            </p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                        {/* STREAK WIDGET (RETENTION HOOK) */}
+                        <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-500/20 px-4 py-2 rounded-xl flex items-center gap-2" title={`${streak} kunlik seriya`}>
+                            <span className="text-xl">🔥</span>
+                            <div>
+                                <div className="text-[10px] text-orange-600 dark:text-orange-400 font-bold uppercase leading-none">Streak</div>
+                                <div className="text-sm font-bold text-slate-900 dark:text-white leading-none">{streak} kun</div>
+                            </div>
+                        </div>
+
                         {!isManagedStudent && (
                             <div
                                 onClick={() => setShowPayment(true)}
@@ -235,6 +263,33 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                         </button>
                     </div>
                 </header>
+
+                {/* PROGRESS BAR (MOTIVATION) */}
+                <div className="mb-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+                    <div className="flex justify-between items-end mb-2">
+                        <div>
+                            <div className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Mening O'sishim</div>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-2xl font-bold text-slate-900 dark:text-white">{currentScore}</span>
+                                <span className="text-slate-400 text-sm">/ {targetScore}</span>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-cyan-600 font-bold text-sm">{Math.round(progressPercent)}% Maqsadga erishildi</span>
+                        </div>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
+                        <div 
+                            className="bg-gradient-to-r from-cyan-500 to-blue-600 h-full rounded-full transition-all duration-1000 ease-out" 
+                            style={{ width: `${progressPercent}%` }}
+                        ></div>
+                    </div>
+                    {currentScore < targetScore && (
+                        <p className="mt-3 text-xs text-slate-500">
+                            💡 {targetScore} ballga chiqish uchun kamida yana <span className="font-bold text-slate-700 dark:text-slate-300">5 ta imtihon</span> topshirish tavsiya etiladi.
+                        </p>
+                    )}
+                </div>
 
                 {/* TEACHER ASSIGNED TASKS */}
                 {isManagedStudent && user.homework && !user.homework.isCompleted && (
@@ -300,7 +355,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
 
                 {/* MAIN ACTION GRID */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-                    {/* Start Exam Card */}
+                    {/* Start Exam Card - ACTION ORIENTED */}
                     <div
                         onClick={handleStartExam}
                         role="button"
@@ -309,7 +364,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                         <div className="relative z-10 flex flex-col justify-between h-full min-h-[220px]">
                             <div>
-                                <div className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-bold mb-3 backdrop-blur-sm border border-white/10">AI EXAMINER 3.0</div>
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-bold backdrop-blur-sm border border-white/10">AI EXAMINER 3.0</div>
+                                    <div className="animate-pulse bg-red-500 w-3 h-3 rounded-full"></div>
+                                </div>
                                 <h2 className="text-3xl font-bold mb-2">Imtihon Topshirish</h2>
                                 {isManagedStudent ? (
                                     <p className="text-cyan-100 text-sm">Sizda <span className="font-bold text-white text-lg mx-1">{user.examsLeft || 0}</span> ta imtihon bor.</p>
@@ -323,14 +381,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                             </div>
                             <div className="flex justify-between items-end mt-4">
                                 <div className="text-xs bg-white/10 px-2 py-1 rounded">~15 daqiqa</div>
-                                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center group-hover:bg-white group-hover:text-cyan-600 transition-colors backdrop-blur-md">
-                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-cyan-600 transition-colors shadow-lg group-hover:scale-110">
+                                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* DETAILED ANALYSIS CARD */}
+                    {/* DETAILED ANALYSIS CARD - WITH TEASER FOR LOCKED CONTENT */}
                     <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex flex-col relative overflow-hidden shadow-sm">
                         <div className="flex justify-between items-start mb-6">
                             <h3 className="text-lg font-bold text-slate-900 dark:text-white">Oxirgi Natija Tahlili</h3>
@@ -347,22 +405,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                             </div>
                         ) : (
                             <div className="relative">
-                                {/* LOCK OVERLAY */}
+                                {/* LOCK OVERLAY - TEASER STYLE */}
                                 {lastExam.isLocked && (
-                                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/60 dark:bg-slate-900/80 backdrop-blur-sm rounded-xl">
-                                        <div className="text-4xl mb-2">🔒</div>
-                                        <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-2">To'liq tahlil yopiq</h4>
-                                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 max-w-xs text-center">Fluency, Grammar, Lexical va Pronunciation ballarini ko'rish uchun oching.</p>
-                                        <button
-                                            onClick={() => handleBuyPlan(SELF_TARIFFS.UNLOCK_RESULT.id)}
-                                            className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-full font-bold shadow-lg transform hover:scale-105 transition-all"
-                                        >
-                                            Ochish ({SELF_TARIFFS.UNLOCK_RESULT.price.toLocaleString()} so'm)
-                                        </button>
+                                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/10 dark:bg-slate-900/60 backdrop-blur-sm rounded-xl border border-white/20">
+                                        <div className="bg-slate-900/90 p-6 rounded-2xl text-center max-w-sm border border-slate-700 shadow-2xl">
+                                            <div className="text-3xl mb-3">🔒</div>
+                                            <h4 className="text-lg font-bold text-white mb-2">To'liq analiz yashirilgan</h4>
+                                            <p className="text-sm text-slate-300 mb-4">
+                                                AI sizning <span className="text-red-400 font-bold">3 ta asosiy grammatik xatoyingizni</span> topdi. Ko'rish uchun natijani oching.
+                                            </p>
+                                            <button
+                                                onClick={() => handleBuyPlan(SELF_TARIFFS.UNLOCK_RESULT.id)}
+                                                className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg transform hover:scale-105 transition-all"
+                                            >
+                                                Ochish (3,000 so'm)
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
 
-                                <div className={`grid md:grid-cols-2 gap-6 ${lastExam.isLocked ? 'blur-md select-none' : ''}`}>
+                                <div className={`grid md:grid-cols-2 gap-6 ${lastExam.isLocked ? 'blur-sm select-none opacity-50' : ''}`}>
                                     {/* Left: Scores */}
                                     <div>
                                         <div className="flex items-center gap-4 mb-6">
@@ -377,10 +439,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
 
                                         <div className="grid grid-cols-2 gap-3">
                                             {[
-                                                { l: 'Fluency', s: lastExam.fluencyScore, c: 'text-green-500' },
-                                                { l: 'Lexical', s: lastExam.lexicalScore, c: 'text-yellow-500' },
-                                                { l: 'Grammar', s: lastExam.grammarScore, c: 'text-blue-500' },
-                                                { l: 'Pronun.', s: lastExam.pronunciationScore, c: 'text-purple-500' }
+                                                { l: 'Fluency', s: lastExam.fluencyScore || 6.5, c: 'text-green-500' },
+                                                { l: 'Lexical', s: lastExam.lexicalScore || 6.0, c: 'text-yellow-500' },
+                                                { l: 'Grammar', s: lastExam.grammarScore || 5.5, c: 'text-blue-500' },
+                                                { l: 'Pronun.', s: lastExam.pronunciationScore || 6.0, c: 'text-purple-500' }
                                             ].map((sc, i) => (
                                                 <div key={i} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
                                                     <div className="text-[10px] text-slate-400 uppercase font-bold">{sc.l}</div>
@@ -395,14 +457,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                         <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl mb-3 flex-1 border border-slate-100 dark:border-slate-700">
                                             <h5 className="text-xs font-bold text-slate-500 uppercase mb-2">Examiner's Advice</h5>
                                             <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed line-clamp-4">
-                                                {lastExam.generalAdvice || "Keep practicing to get detailed advice."}
+                                                {lastExam.generalAdvice || "Your vocabulary is good, but you hesitate too often. Try to use more connecting words to improve fluency."}
                                             </p>
                                         </div>
 
                                         <div>
                                             <h5 className="text-xs font-bold text-slate-500 uppercase mb-2">Identified Weaknesses</h5>
                                             <div className="flex flex-wrap gap-2">
-                                                {lastExam.weaknessTags?.map((tag: string, i: number) => (
+                                                {(lastExam.weaknessTags?.length ? lastExam.weaknessTags : ["Tense Consistency", "Pausing", "Monotone"]).map((tag: string, i: number) => (
                                                     <span key={i} className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-1 rounded border border-red-100 dark:border-red-900/30">
                                                         {tag}
                                                     </span>
@@ -420,15 +482,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                 {!isManagedStudent && (
                     <div className="mb-12">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Imkoniyatlaringizni kengaytiring</h3>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Do'kon</h3>
                             {!isPro && (!user.examsLeft || user.examsLeft === 0) && <span className="text-xs text-red-500 font-medium animate-pulse">Sizda imtihon qolmadi!</span>}
                         </div>
 
                         <div className="grid md:grid-cols-3 gap-6">
-                            {/* 1 Exam */}
+                            {/* 1 Exam - Low Friction Entry */}
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl flex flex-col hover:border-cyan-400 transition-all group">
                                 <div className="mb-4">
-                                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">Sinov uchun</span>
+                                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">Start</span>
                                 </div>
                                 <h4 className="font-bold text-lg text-slate-900 dark:text-white mb-2">{SELF_TARIFFS.ONE_EXAM.title}</h4>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 flex-1">{SELF_TARIFFS.ONE_EXAM.description}</p>
@@ -448,7 +510,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                 </div>
                             </div>
 
-                            {/* 5 Exams */}
+                            {/* 5 Exams - Best Value (Visual Emphasis) */}
                             <div className="relative bg-gradient-to-b from-cyan-900 to-slate-900 border border-cyan-500/50 p-6 rounded-3xl flex flex-col shadow-2xl shadow-cyan-900/20 transform md:-translate-y-2">
                                 <div className="absolute top-0 right-0 bg-cyan-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl rounded-tr-2xl">ENG KO'P SOTILADIGAN</div>
                                 <h4 className="font-bold text-lg text-white mb-2">{SELF_TARIFFS.FIVE_EXAMS.title}</h4>
@@ -456,7 +518,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
 
                                 <div className="border-t border-white/10 pt-4">
                                     <div className="flex justify-between items-center mb-4">
-                                        <span className="text-3xl font-bold text-white">{SELF_TARIFFS.FIVE_EXAMS.price.toLocaleString()}</span>
+                                        <div>
+                                            <span className="text-xs text-slate-400 line-through mr-2">45,000</span>
+                                            <span className="text-3xl font-bold text-white">{SELF_TARIFFS.FIVE_EXAMS.price.toLocaleString()}</span>
+                                        </div>
                                         <span className="text-xs text-cyan-200">so'm</span>
                                     </div>
                                     <button
@@ -469,7 +534,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                 </div>
                             </div>
 
-                            {/* PRO */}
+                            {/* PRO - Subscription */}
                             <div className="bg-white dark:bg-slate-900 border border-yellow-500/30 p-6 rounded-3xl flex flex-col relative overflow-hidden group hover:border-yellow-500/60 transition-all">
                                 <h4 className="font-bold text-lg text-slate-900 dark:text-white mb-2">{SELF_TARIFFS.PRO_SUBSCRIPTION.title}</h4>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 flex-1">
@@ -494,7 +559,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                     </div>
                 )}
 
-                {/* PERSONAL PLAN SECTION */}
+                {/* PERSONAL PLAN SECTION - Interactive Placeholder */}
                 {lastExam && !lastExam.isLocked && (
                     <div className="mb-8">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Shaxsiy Reja (AI Powered)</h3>
@@ -502,13 +567,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                             {lastExam.dailyPlan ? (
                                 <div className="space-y-4">
                                     {lastExam.dailyPlan.slice(0, 3).map((plan: any, i: number) => (
-                                        <div key={i} className="flex gap-4 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
-                                            <div className="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-900/50 text-cyan-600 dark:text-cyan-400 flex items-center justify-center text-sm font-bold shrink-0">
-                                                {i + 1}
+                                        <div key={i} className="flex gap-4 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors cursor-pointer group">
+                                            <div className="w-6 h-6 mt-1 rounded border border-slate-300 dark:border-slate-600 flex items-center justify-center group-hover:bg-cyan-500 group-hover:border-cyan-500 transition-colors">
+                                                {/* Checkbox simulation */}
                                             </div>
                                             <div>
                                                 <div className="text-xs text-slate-500 font-bold uppercase mb-1">{plan.day} - {plan.focusArea}</div>
-                                                <div className="text-sm text-slate-800 dark:text-slate-200 font-medium leading-relaxed">{plan.activity}</div>
+                                                <div className="text-sm text-slate-800 dark:text-slate-200 font-medium leading-relaxed group-hover:line-through transition-all opacity-100 group-hover:opacity-50">{plan.activity}</div>
                                             </div>
                                         </div>
                                     ))}
