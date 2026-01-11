@@ -106,7 +106,16 @@ const userSchema = new mongoose.Schema({
       text: String,
       assignedAt: Date,
       isCompleted: { type: Boolean, default: false }
-  }
+  },
+
+  // GROWTH FEATURES
+  dictionary: [{
+      word: String,
+      definition: String,
+      example: String,
+      addedAt: { type: Date, default: Date.now },
+      masteryLevel: { type: Number, default: 1 }
+  }]
 });
 
 const examSchema = new mongoose.Schema({
@@ -118,6 +127,11 @@ const examSchema = new mongoose.Schema({
   grammarScore: Number,
   pronunciationScore: Number,
   generalAdvice: String, 
+  
+  // COACHING
+  band9Response: String,
+  coachTip: String,
+
   weaknessTags: [String],
   weaknessCategories: {
     fluency: String,
@@ -145,7 +159,7 @@ const paymentRequestSchema = new mongoose.Schema({
     userEmail: String,
     amount: Number,
     note: String, 
-    receiptPath: String, // Kept for legacy support, but will mostly be null/telegram-ref
+    receiptPath: String, 
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
     date: { type: Date, default: Date.now }
 });
@@ -214,6 +228,34 @@ async function sendTelegramMessage(text) {
 }
 
 // --- Routes ---
+
+// DICTIONARY ROUTES
+app.post('/api/user/dictionary/add', async (req, res) => {
+    try {
+        const { userId, word, definition, example } = req.body;
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        if (!user.dictionary) user.dictionary = [];
+        // Check duplicate
+        if (!user.dictionary.some(i => i.word.toLowerCase() === word.toLowerCase())) {
+            user.dictionary.push({ word, definition, example, addedAt: new Date(), masteryLevel: 1 });
+            await user.save();
+        }
+        res.json(user.dictionary);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.delete('/api/user/dictionary/:userId/:word', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId);
+        if (!user) return res.status(404).json({ message: "User not found" });
+        
+        user.dictionary = user.dictionary.filter(i => i.word !== req.params.word);
+        await user.save();
+        res.json(user.dictionary);
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
 
 // 1. SIGNUP (Email/Pass)
 app.post('/api/signup', async (req, res) => {
@@ -519,6 +561,11 @@ app.post('/api/results', async (req, res) => {
         grammarScore: result.grammar.score,
         pronunciationScore: result.pronunciation.score,
         generalAdvice: result.generalAdvice,
+        
+        // NEW FIELDS
+        band9Response: result.band9Response,
+        coachTip: result.coachTip,
+
         weaknessTags: result.weaknessTags,
         weaknessCategories: result.weaknessCategories,
         drills: result.drills,
