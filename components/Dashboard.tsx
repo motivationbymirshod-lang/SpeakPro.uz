@@ -29,6 +29,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
     // Gamification States
     const [streak, setStreak] = useState(0);
 
+    // MARKETING TRIGGERS
+    const [examDate, setExamDate] = useState<string | null>(localStorage.getItem('target_exam_date'));
+    const [timeLeft, setTimeLeft] = useState<string>('');
+    const [offerTime, setOfferTime] = useState(900); // 15 minutes in seconds
+    const [liveMsg, setLiveMsg] = useState("Azizbek just scored Band 7.5 🎉");
+
     // EXTRACTED: Refresh logic to be called manually or on mount
     const refreshUser = async () => {
         try {
@@ -58,6 +64,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
     // Refresh user data (balance/plan) on mount AND Send Heartbeat
     useEffect(() => {
         refreshUser();
+        
+        // Live Ticker Logic
+        const messages = [
+            "Malika PRO paket sotib oldi 🚀",
+            "Jamshid Band 7.0 oldi 👏",
+            "124 student hozir online 🟢",
+            "Shaxzoda 1-imtihonini topshirdi 📝",
+            "Sardor Speakingdan 6.5 dan 7.5 ga chiqdi 📈"
+        ];
+        const ticker = setInterval(() => {
+            setLiveMsg(messages[Math.floor(Math.random() * messages.length)]);
+        }, 5000);
+
+        // Limited Offer Timer
+        const offer = setInterval(() => {
+            setOfferTime(prev => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+
+        return () => { clearInterval(ticker); clearInterval(offer); };
     }, []); // Only on mount
 
     useEffect(() => {
@@ -76,6 +101,33 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
         };
         fetchHistory();
     }, [user.email]);
+
+    // Exam Countdown Logic
+    useEffect(() => {
+        if (!examDate) return;
+        const interval = setInterval(() => {
+            const now = new Date().getTime();
+            const distance = new Date(examDate).getTime() - now;
+            if (distance < 0) {
+                setTimeLeft("IMTIHON KUNI!");
+            } else {
+                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                setTimeLeft(`${days} kun qoldi`);
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [examDate]);
+
+    const handleSetExamDate = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setExamDate(e.target.value);
+        localStorage.setItem('target_exam_date', e.target.value);
+    };
+
+    const formatOfferTime = (seconds: number) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    };
 
     const handleLogout = () => {
         logoutUser();
@@ -209,9 +261,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-200 pb-20 transition-colors duration-300 font-sans">
+            {/* LIVE SOCIAL PROOF TICKER */}
+            <div className="bg-slate-900 text-slate-400 text-[10px] py-1 text-center border-b border-slate-800 tracking-wider overflow-hidden">
+                <span className="animate-pulse inline-block w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                {liveMsg}
+            </div>
+
             <div className="max-w-7xl mx-auto p-4 md:p-8">
                 {/* HEADER */}
-                <header className="flex flex-col md:flex-row justify-between items-center mb-10 py-4 gap-4">
+                <header className="flex flex-col md:flex-row justify-between items-center mb-8 py-4 gap-4">
                     <div className="flex items-center gap-4 w-full md:w-auto">
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-xl relative ${isPro ? 'bg-gradient-to-br from-yellow-500 to-orange-600 shadow-orange-500/20' : 'bg-gradient-to-br from-cyan-600 to-blue-600 shadow-cyan-500/30'}`}>
                             {user.firstName[0]}
@@ -221,15 +279,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Xush kelibsiz, <span className={isPro ? "text-yellow-600 dark:text-yellow-400" : "text-cyan-600 dark:text-cyan-400"}>{user.firstName}</span></h1>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                                <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                                Maqsad sari: {user.targetLevel} Band
-                            </p>
+                            <div className="flex items-center gap-3 mt-1">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                    <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
+                                    Maqsad: {user.targetLevel}
+                                </p>
+                                
+                                {/* EXAM DATE INPUT (URGENCY TRIGGER) */}
+                                <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-0.5 relative group cursor-pointer hover:border-red-500 transition-colors">
+                                    {timeLeft ? (
+                                        <span className="text-[10px] font-bold text-red-600 dark:text-red-400 animate-pulse uppercase tracking-wide">⏳ {timeLeft}</span>
+                                    ) : (
+                                        <span className="text-[10px] text-slate-400 group-hover:text-red-500">Imtihon qachon?</span>
+                                    )}
+                                    <input 
+                                        type="date" 
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                                        onChange={handleSetExamDate}
+                                        value={examDate || ''}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                        {/* STREAK WIDGET (RETENTION HOOK) */}
+                        {/* STREAK WIDGET */}
                         <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-500/20 px-4 py-2 rounded-xl flex items-center gap-2" title={`${streak} kunlik seriya`}>
                             <span className="text-xl">🔥</span>
                             <div>
@@ -478,6 +553,35 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                     </div>
                 </div>
 
+                {/* SPECIAL URGENCY OFFER BANNER (If not paid) */}
+                {!isManagedStudent && !user.hasPaidHistory && (
+                    <div className="mb-10 bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl p-[2px] shadow-2xl animate-pulse-slow">
+                        <div className="bg-white dark:bg-slate-900 rounded-[14px] p-4 md:p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-3 rounded-xl font-mono font-bold text-2xl border border-red-200 dark:border-red-800">
+                                    {formatOfferTime(offerTime)}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="font-bold text-red-600 dark:text-red-500 uppercase tracking-wider text-sm">One-Time Offer</h4>
+                                        <span className="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded animate-pulse">EXPIRING SOON</span>
+                                    </div>
+                                    <p className="text-slate-900 dark:text-white font-bold text-lg leading-tight mt-1">
+                                        Get <span className="text-indigo-500">5 Exam Pack</span> with Priority Analysis
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-1">Usually 45,000. Now only 39,000 UZS.</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => handleBuyPlan(SELF_TARIFFS.FIVE_EXAMS.id)} 
+                                className="w-full md:w-auto bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg shadow-red-500/30"
+                            >
+                                Claim Offer
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* SALES / UPGRADE SECTION (HIDDEN FOR B2B STUDENTS) */}
                 {!isManagedStudent && (
                     <div className="mb-12">
@@ -515,6 +619,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                 <div className="absolute top-0 right-0 bg-cyan-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl rounded-tr-2xl">ENG KO'P SOTILADIGAN</div>
                                 <h4 className="font-bold text-lg text-white mb-2">{SELF_TARIFFS.FIVE_EXAMS.title}</h4>
                                 <p className="text-xs text-cyan-100/70 mb-6 flex-1">{SELF_TARIFFS.FIVE_EXAMS.description}</p>
+                                
+                                {/* SCARCITY TRIGGER */}
+                                <div className="text-[10px] text-red-400 font-bold mb-2 animate-pulse">🔥 Only 3 packs left at this price</div>
 
                                 <div className="border-t border-white/10 pt-4">
                                     <div className="flex justify-between items-center mb-4">
