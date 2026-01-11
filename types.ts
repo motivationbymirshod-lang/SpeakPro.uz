@@ -1,5 +1,4 @@
 
-
 export interface UserProfile {
   firstName: string;
   lastName: string;
@@ -14,15 +13,15 @@ export interface UserProfile {
   lastSeen?: string; 
   
   // Security & Verification
-  isEmailVerified?: boolean; // NEW: Required for Free Trial
+  isEmailVerified?: boolean;
 
   // Monetization Fields
-  balance: number; // in UZS
+  balance: number;
   subscriptionPlan: 'free' | 'pro' | 'unlimited_teacher';
-  subscriptionExpiresAt?: string; // ISO Date
+  subscriptionExpiresAt?: string;
   
-  examsLeft?: number; // Credits available
-  hasPaidHistory?: boolean; // NEW: Tracks if user ever paid (to unlock results)
+  examsLeft?: number;
+  hasPaidHistory?: boolean;
   hasUsedFreeTrial?: boolean; 
   
   // B2B Field
@@ -34,6 +33,18 @@ export interface UserProfile {
       assignedAt: string;
       isCompleted: boolean;
   };
+
+  // NEW: GROWTH FEATURES
+  dictionary?: DictionaryItem[];
+  roadmapProgress?: number; // 0-100
+}
+
+export interface DictionaryItem {
+    word: string;
+    definition: string;
+    example: string;
+    addedAt: string;
+    masteryLevel: number; // 1-5 (Spaced Repetition uchun)
 }
 
 export interface TeacherStudent {
@@ -47,19 +58,16 @@ export interface TeacherStudent {
     lastExam?: {
         date: string;
         overallBand: number;
-        // Updated fields to match server response
         fluencyScore?: number;
         lexicalScore?: number;
         grammarScore?: number;
         pronunciationScore?: number;
         weaknessTags?: string[];
-
-        // Legacy/Alternative structure support
         scores?: {
-            f: number; // Fluency
-            l: number; // Lexical
-            g: number; // Grammar
-            p: number; // Pronunciation
+            f: number;
+            l: number;
+            g: number;
+            p: number;
         };
         weaknesses?: string[];
     };
@@ -91,6 +99,11 @@ export interface ExamResult {
   grammar: FeedbackSection;
   pronunciation: FeedbackSection;
   generalAdvice: string;
+  
+  // NEW: COACHING FEATURES
+  band9Response?: string; // AI generated perfect answer
+  coachTip?: string; // Short actionable tip (e.g. "Don't use 'very good', use 'splendid'")
+  
   weaknessTags: string[]; 
   drills: Drill[];
   dailyPlan: PlanDay[];
