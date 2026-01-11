@@ -13,9 +13,9 @@ export const generateExamFeedback = async (transcript: string, targetLevel: stri
 
   const ai = new GoogleGenAI({ apiKey });
   
-  // LOGIC UPDATED TO MATCH REQUESTED 'assessLevelIELTS' LOGIC
+  // LOGIC UPDATED FOR "COACH" MODE
   const promptText = `
-    TASK: Evaluate the user's IELTS Speaking answers. Provide scores from 1-9 for each of the 4 criteria.
+    TASK: Act as an elite IELTS Speaking Coach. Evaluate the candidate's answers and TEACH them how to improve.
     
     CANDIDATE TARGET: ${targetLevel}
     
@@ -25,17 +25,17 @@ export const generateExamFeedback = async (transcript: string, targetLevel: stri
     ---
 
     GRADING LOGIC (Strict Adherence):
-    1. Fluency and Coherence: Analyze hesitation, repetition, self-correction, and connective markers.
-    2. Lexical Resource: Analyze vocabulary range, idiomatic language, and paraphrasing skills.
-    3. Grammatical Range and Accuracy: Analyze sentence structures and error density.
-    4. Pronunciation: Analyze intonation, individual sounds, clarity, and stress.
+    1. Fluency: Analyze hesitation, repetition, and flow.
+    2. Lexical: Analyze vocabulary range and idiomatic usage.
+    3. Grammar: Analyze sentence structures and errors.
+    4. Pronunciation: Analyze intonation and clarity.
+
+    COACHING REQUIREMENTS:
+    - Provide a "Band 9.0 Response" (band9Response) for the main topic discussed. This is critical for the user to learn by example.
+    - Provide a "Coach Tip" (coachTip) - a single, high-impact piece of advice (e.g. "You overuse 'very'. Use 'immensely' or 'substantially' instead.").
 
     OUTPUT INSTRUCTIONS:
-    - You must return a valid JSON object.
-    - For each criteria, provide a Score (float) and a detailed "Comment" that includes both your Analysis and Advice.
-    - Provide an "Overall Band Score".
-    - Provide "Recommendations" (generalAdvice).
-    - Generate "Drills" and a "Daily Plan" to help the user improve (Required by system).
+    - Return a valid JSON object.
   `;
 
   const generate = async (retries = 3): Promise<ExamResult> => {
@@ -57,7 +57,7 @@ export const generateExamFeedback = async (transcript: string, targetLevel: stri
                 type: Type.OBJECT,
                 properties: { 
                     score: { type: Type.NUMBER }, 
-                    comments: { type: Type.STRING, description: "Analysis and Advice combined." } 
+                    comments: { type: Type.STRING } 
                 },
                 required: ["score", "comments"]
               },
@@ -65,7 +65,7 @@ export const generateExamFeedback = async (transcript: string, targetLevel: stri
                 type: Type.OBJECT,
                 properties: { 
                     score: { type: Type.NUMBER }, 
-                    comments: { type: Type.STRING, description: "Analysis and Advice combined." } 
+                    comments: { type: Type.STRING } 
                 },
                 required: ["score", "comments"]
               },
@@ -73,7 +73,7 @@ export const generateExamFeedback = async (transcript: string, targetLevel: stri
                 type: Type.OBJECT,
                 properties: { 
                     score: { type: Type.NUMBER }, 
-                    comments: { type: Type.STRING, description: "Analysis and Advice combined." } 
+                    comments: { type: Type.STRING } 
                 },
                 required: ["score", "comments"]
               },
@@ -81,15 +81,19 @@ export const generateExamFeedback = async (transcript: string, targetLevel: stri
                 type: Type.OBJECT,
                 properties: { 
                     score: { type: Type.NUMBER }, 
-                    comments: { type: Type.STRING, description: "Analysis and Advice combined." } 
+                    comments: { type: Type.STRING } 
                 },
                 required: ["score", "comments"]
               },
-              generalAdvice: { type: Type.STRING, description: "General recommendations" },
+              generalAdvice: { type: Type.STRING },
+              
+              // NEW FIELDS
+              band9Response: { type: Type.STRING, description: "A perfect Band 9.0 model answer for the topic." },
+              coachTip: { type: Type.STRING, description: "A short, actionable improvement tip." },
+
               weaknessTags: { 
                   type: Type.ARRAY, 
-                  items: { type: Type.STRING },
-                  description: "3-5 short tags e.g., 'Monotone', 'Tense Confusion'"
+                  items: { type: Type.STRING }
               },
               drills: {
                   type: Type.ARRAY,
@@ -116,7 +120,7 @@ export const generateExamFeedback = async (transcript: string, targetLevel: stri
                   }
               }
             },
-            required: ["overallBand", "fluency", "lexical", "grammar", "pronunciation", "generalAdvice", "weaknessTags", "drills", "dailyPlan"]
+            required: ["overallBand", "fluency", "lexical", "grammar", "pronunciation", "generalAdvice", "band9Response", "coachTip", "weaknessTags", "drills", "dailyPlan"]
           }
         }
       });
