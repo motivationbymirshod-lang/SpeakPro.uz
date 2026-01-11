@@ -14,6 +14,7 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
     const [currentUser, setCurrentUser] = useState<UserProfile | null>(getCurrentUser());
     const [showPayment, setShowPayment] = useState(false);
     const [unlocking, setUnlocking] = useState(false);
+    const [showModelAnswer, setShowModelAnswer] = useState(false);
 
     // Feedback State
     const [feedbackRating, setFeedbackRating] = useState(0);
@@ -25,8 +26,7 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
     const isLocked = result.isLocked;
 
     const handleUnlockClick = () => {
-        // Check balance. If < 5000, show payment modal. If > 5000, deduct directly.
-        if ((currentUser?.balance || 0) < 5000) {
+        if ((currentUser?.balance || 0) < 3000) {
             setShowPayment(true);
         } else {
             unlockResultDirectly();
@@ -48,7 +48,6 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
             });
             const data = await res.json();
             if (res.ok) {
-                // Update local state and reload to remove lock
                 alert("Muvaffaqiyatli ochildi!");
                 window.location.reload();
             } else {
@@ -59,6 +58,23 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
         } finally {
             setUnlocking(false);
         }
+    };
+
+    const addToDictionary = async (word: string) => {
+        if(!currentUser) return;
+        try {
+            await fetch('https://speakpro-uz.onrender.com/api/user/dictionary/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    userId: currentUser._id,
+                    word: word,
+                    definition: "Saved from Exam Feedback",
+                    example: "Review context in exam result."
+                })
+            });
+            alert(`"${word}" lug'atga qo'shildi!`);
+        } catch(e) { alert("Xatolik"); }
     };
 
     const submitFeedback = async () => {
@@ -90,6 +106,14 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
 
             {showPayment && currentUser && (
                 <PaymentModal user={currentUser} onClose={() => setShowPayment(false)} />
+            )}
+
+            {/* COACH TIP HEADER */}
+            {result.coachTip && !isLocked && (
+                <div className="bg-gradient-to-r from-indigo-900 to-slate-900 border-l-4 border-indigo-500 p-6 rounded-r-xl mb-8 shadow-xl">
+                    <h3 className="text-indigo-400 font-bold text-xs uppercase tracking-widest mb-2">💡 Coach's Top Tip</h3>
+                    <p className="text-white text-lg font-medium italic">"{result.coachTip}"</p>
+                </div>
             )}
 
             <div className="flex justify-between items-center mb-6">
@@ -124,22 +148,22 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
                     </div>
                 </div>
 
-                {/* Radar Chart Analysis (LOCKED IF FREE EXAM) */}
+                {/* Radar Chart Analysis */}
                 <div className="lg:col-span-2 glass-card p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 relative overflow-hidden">
                     {isLocked && (
                         <div className="absolute inset-0 z-20 backdrop-blur-sm bg-white/60 dark:bg-black/80 flex flex-col items-center justify-center">
                             <div className="bg-slate-900/90 p-6 rounded-2xl text-center max-w-sm shadow-2xl border border-slate-700">
                                 <div className="text-4xl mb-3">🔒</div>
-                                <h3 className="text-xl font-bold text-white mb-2">To'liq hisobotni oching</h3>
-                                <p className="text-sm text-slate-300 mb-6">Fluency, Grammar va Pronunciation bo'yicha aniq ballaringizni biling.</p>
+                                <h3 className="text-xl font-bold text-white mb-2">Unlock Full Report</h3>
+                                <p className="text-sm text-slate-300 mb-6">See your exact scores for Fluency, Vocabulary, Grammar, and Pronunciation.</p>
                                 <button onClick={handleUnlockClick} className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold py-3 px-8 rounded-full shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2 w-full">
-                                    <span>Ochish (3,000 UZS)</span>
+                                    <span>Unlock (3,000 UZS)</span>
                                 </button>
                             </div>
                         </div>
                     )}
 
-                    <h3 className="text-sm text-slate-500 dark:text-slate-400 uppercase mb-2 pl-4">Skill Breakdown (Radar View)</h3>
+                    <h3 className="text-sm text-slate-500 dark:text-slate-400 uppercase mb-2 pl-4">Skill Breakdown</h3>
 
                     <div className={`h-64 w-full transition-all duration-300 ${isLocked ? 'blur-md opacity-50' : ''}`}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -154,12 +178,40 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
                 </div>
             </div>
 
+            {/* BAND 9.0 MODEL ANSWER (NEW) */}
+            {!isLocked && result.band9Response && (
+                <div className="mb-8">
+                    <button 
+                        onClick={() => setShowModelAnswer(!showModelAnswer)}
+                        className="w-full flex items-center justify-between bg-gradient-to-r from-green-900 to-emerald-900 border border-green-700/50 p-4 rounded-xl text-white hover:bg-green-800 transition-all shadow-lg group"
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="text-2xl">🏆</span>
+                            <div className="text-left">
+                                <div className="font-bold text-lg">Compare with Band 9.0</div>
+                                <div className="text-xs text-green-300">See how a native speaker would answer this topic.</div>
+                            </div>
+                        </div>
+                        <span className={`transform transition-transform ${showModelAnswer ? 'rotate-180' : ''}`}>▼</span>
+                    </button>
+                    
+                    {showModelAnswer && (
+                        <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-b-xl mt-1 animate-fade-in">
+                            <p className="text-slate-300 leading-relaxed italic whitespace-pre-line border-l-2 border-green-500 pl-4">
+                                {result.band9Response}
+                            </p>
+                            <div className="mt-4 flex gap-2">
+                                <button onClick={() => addToDictionary("Advanced Vocab")} className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded border border-slate-700">Save Vocabulary from this answer</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* DETAILED CRITERIA GRID (LOCKED) */}
             <div className={`grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 transition-all relative ${isLocked ? 'pointer-events-none select-none' : ''}`}>
                 {isLocked && (
-                    <div className="absolute inset-0 z-20 backdrop-blur-sm bg-white/10 dark:bg-black/20 rounded-2xl flex items-center justify-center border border-white/20">
-                        {/* Hidden to emphasize the main unlock button above, but prevents clicks */}
-                    </div>
+                    <div className="absolute inset-0 z-20 backdrop-blur-sm bg-white/10 dark:bg-black/20 rounded-2xl flex items-center justify-center border border-white/20"></div>
                 )}
                 {[
                     { title: 'Fluency', data: result.fluency, color: 'text-green-600 dark:text-green-400', border: 'border-green-500/30' },
