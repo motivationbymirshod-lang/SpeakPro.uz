@@ -230,7 +230,7 @@ function App() {
                 <div className="absolute inset-2 border-b-4 border-purple-500 border-solid rounded-full animate-spin reverse"></div>
               </div>
               <p className="text-2xl font-bold text-slate-900 dark:text-white mt-8 tracking-wider animate-pulse">GENERATING REPORT</p>
-              <p className="text-sm text-cyan-600 dark:text-cyan-500/60 mt-2 font-mono">Comparing against Band {user?.targetLevel || '7.0'} standards...</p>
+              <p className="text-sm text-cyan-600 dark:text-cyan-500/60 mt-2 font-mono">Comparing against Band 9.0 standards...</p>
               <div className="flex gap-2 mt-4">
                 <span className="w-2 h-2 bg-slate-400 dark:bg-slate-600 rounded-full animate-bounce delay-75"></span>
                 <span className="w-2 h-2 bg-slate-400 dark:bg-slate-600 rounded-full animate-bounce delay-150"></span>
