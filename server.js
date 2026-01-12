@@ -87,6 +87,8 @@ const userSchema = new mongoose.Schema({
 
   currentLevel: String,
   targetLevel: String,
+  examDate: Date, // NEW FIELD ADDED
+
   joinedAt: { type: Date, default: Date.now },
   lastSeen: { type: Date, default: Date.now }, 
   role: { type: String, enum: ['student', 'teacher', 'admin'], default: 'student' },
@@ -382,20 +384,25 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
-// --- USER SELF PASSWORD UPDATE ---
+// --- USER SELF PASSWORD UPDATE & DATE SET ---
 app.post('/api/user/update-password', async (req, res) => {
     try {
-        const { userId, newPassword } = req.body;
+        const { userId, newPassword, examDate } = req.body; // Added examDate
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ message: "User topilmadi" });
 
-        user.password = newPassword;
-        // Agar vaqtinchalik parol ishlatilgan bo'lsa, uni o'chiramiz
-        user.tempPassword = null;
-        user.tempPasswordExpires = null;
+        if (newPassword) {
+            user.password = newPassword;
+            user.tempPassword = null;
+            user.tempPasswordExpires = null;
+        }
+        
+        if (examDate) {
+            user.examDate = new Date(examDate);
+        }
         
         await user.save();
-        res.json({ success: true, message: "Parol muvaffaqiyatli o'zgartirildi" });
+        res.json({ success: true, message: "Profil yangilandi", user });
     } catch (e) {
         res.status(500).json({ message: e.message });
     }
