@@ -7,6 +7,7 @@ interface LandingProps {
 
 const Landing: React.FC<LandingProps> = ({ onStart }) => {
   const [showVideo, setShowVideo] = useState(false);
+  const [showSample, setShowSample] = useState(false); // NEW STATE
   const [activeLang, setActiveLang] = useState<'UZ' | 'EN'>('EN'); // Default EN
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
@@ -14,15 +15,12 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
   const t = {
     UZ: {
       nav: { features: "Afzalliklar", comparison: "Farqi", pricing: "Narxlar", login: "Kirish" },
-      
-      // 1. HERO (RESULT FOCUSED)
       heroTitle: "IELTS Speakingdan",
       heroTitleHighlight: "7.5+ Ball Oling",
       heroSubtitle: "Imtihon hayajonini yengishning eng yaxshi yo'li. AI Examiner bilan xuddi real imtihondagidek mashq qiling.",
       startBtn: "HOZIROQ BEPUL BOSHLASH",
+      sampleBtn: "NAMUNANI KO'RISH", // NEW
       noCard: "⚡ Karta talab qilinmaydi. 1 daqiqada hisob oching.",
-      
-      // 2. PROBLEM (AGITATION)
       probTitle: "Nega ballingiz oshmayapti?",
       probSub: "Muammo sizning bilimingizda emas, muammo — amaliyot kamligida.",
       prob1: "Imtihon hayajoni",
@@ -31,8 +29,6 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
       prob2Desc: "\"Meni aytadigan gapim yo'q\" — eng katta dushman. AI sizga har xil mavzularda savol berib, fikrlashingizni ochadi.",
       prob3: "Repetitor qimmat",
       prob3Desc: "Har kuni repetitor bilan gaplashishga imkoniyat yo'qmi? AI 24/7 siz bilan.",
-
-      // 3. SOLUTION (BENEFITS)
       solTitle: "SpeakPro — cho'ntakdagi imtihon.",
       solTitle2: "Bu shunchaki ilova emas, bu sizning shaxsiy murabbiyingiz.",
       sol1: "3 Soniyada Natija",
@@ -43,15 +39,11 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
       sol3Desc: "Xohlasangiz ertalab, xohlasangiz tunda. SpeakPro hech qachon charchamaydi.",
       sol4: "Shaxsiy Drills",
       sol4Desc: "AI sizning xatoyingizni topib, aynan shu xato ustida mashq qildiradi.",
-
-      // 4. HOW IT WORKS
       howTitle: "Qanday ishlaydi?",
       step1: "Mavzu tushadi",
       step2: "Gapirasiz (Part 1-3)",
       step3: "Ball olasiz",
       step4: "Xatoni to'g'irlaysiz",
-
-      // 5. TESTIMONIALS
       testiTitle: "Natijalar gapiradi",
       testiSub: "Minglab o'quvchilar SpeakPro yordamida o'z maqsadlariga erishdilar.",
       reviews: [
@@ -59,8 +51,6 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
           { name: "Malika S.", band: "Band 7.0", text: "Repetitorim bilan haftada 2 marta qilardik, bu yerda esa har kuni mashq qildim. 6.0 dan 7.0 ga chiqdim.", stars: 5 },
           { name: "Jamshid K.", band: "Band 8.0", text: "Feedbacklari dahshat. Qaysi so'zni noto'g'ri talaffuz qilganimni sekundigacha aytib beradi.", stars: 5 },
       ],
-
-      // 6. COMPARISON
       vsTitle: "Eski usul vs SpeakPro",
       vsSub: "Repetitor strategiyani o'rgatadi. Biz esa takrorlashni beramiz.",
       vsRepetitor: "Repetitor",
@@ -71,24 +61,15 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
       vsRow2Ai: "Obyektiv & Batafsil tahlil",
       vsRow3: "Qimmat ($100+/oy)",
       vsRow3Ai: "Deyarli tekin",
-
-      // 7. PRICING (RISK REVERSAL)
       priceHeader: "Hozircha hamyonni ochmang",
       priceSub: "Avval tizimni bepul sinab ko'ring. Yoqsa, keyin davom ettirasiz.",
       freePlanBtn: "BEPUL SINOVNI BOSHLASH",
       paidPlanBtn: "Xarid qilish",
-      
-      // 8. FAQ
       faqTitle: "Ko'p so'raladigan savollar",
-      
-      // 9. FINAL CTA
       ctaTitle: "7.5+ Ball sari birinchi qadam",
       ctaSub: "Sizda yo'qotadigan hech narsa yo'q, lekin yutadiganingiz — kelajagingiz.",
       ctaBtn: "BEPUL IMTIHONNI BOSHLASH",
-
       stuTitle: "Mustaqil o'rganuvchilar uchun",
-
-      // CARDS
       priceCards: {
           one: { title: "1 ta Imtihon", desc: "Sinov", price: "BEPUL", valueProp: "Xavfsiz start. To'liq analiz." },
           five: { title: "5 ta Imtihon", desc: "Intensiv", price: "39,000 so'm", valueProp: "Ommabop. Donasi 7,800 so'mdan." },
@@ -97,15 +78,12 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
     },
     EN: {
       nav: { features: "Benefits", comparison: "Compare", pricing: "Pricing", login: "Login" },
-
-      // 1. HERO
       heroTitle: "Score Band 7.5+ in",
       heroTitleHighlight: "IELTS Speaking",
       heroSubtitle: "The best way to overcome exam anxiety. Practice with an AI Examiner just like the real test.",
       startBtn: "START FREE EXAM NOW",
+      sampleBtn: "SEE SAMPLE REPORT", // NEW
       noCard: "⚡ No credit card required. Account setup in 1 min.",
-
-      // 2. PROBLEM
       probTitle: "Why is your score stuck?",
       probSub: "The problem isn't your English, it's the lack of practice under pressure.",
       prob1: "Exam Anxiety",
@@ -114,8 +92,6 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
       prob2Desc: "\"I have nothing to say.\" Our AI challenges you with diverse topics to unlock your flow.",
       prob3: "Tutors are Expensive",
       prob3Desc: "Can't afford daily lessons? SpeakPro is your 24/7 partner for a fraction of the cost.",
-
-      // 3. SOLUTION
       solTitle: "SpeakPro is your Pocket Examiner.",
       solTitle2: "Not just an app, but a personal coach.",
       sol1: "Instant Score",
@@ -126,15 +102,11 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
       sol3Desc: "Practice at 6 AM or 11 PM. SpeakPro never gets tired.",
       sol4: "Smart Drills",
       sol4Desc: "We create personalized drills based on your specific mistakes.",
-
-      // 4. HOW IT WORKS
       howTitle: "How it works?",
       step1: "Get Topic",
       step2: "Speak (Part 1-3)",
       step3: "Get Analysis",
       step4: "Practice Drills",
-
-      // 5. TESTIMONIALS
       testiTitle: "Results speak louder",
       testiSub: "Thousands of students reached their target scores with SpeakPro.",
       reviews: [
@@ -142,8 +114,6 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
           { name: "Malika S.", band: "Band 7.0", text: "I only practiced twice a week with my tutor, but here I practiced daily. Improved from 6.0 to 7.0.", stars: 5 },
           { name: "Jamshid K.", band: "Band 8.0", text: "The feedback is insane. It tells me exactly which word I mispronounced down to the second.", stars: 5 },
       ],
-
-      // 6. COMPARISON
       vsTitle: "Old Way vs SpeakPro",
       vsSub: "Tutors teach you strategy. SpeakPro gives you the reps.",
       vsRepetitor: "Human Tutor",
@@ -154,23 +124,15 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
       vsRow2Ai: "Data-driven deep analysis",
       vsRow3: "Expensive ($100+/mo)",
       vsRow3Ai: "Affordable (Coffee price)",
-
-      // 7. PRICING
       priceHeader: "Keep your wallet closed",
       priceSub: "Try the system for free first. Upgrade only if you love it.",
       freePlanBtn: "START FREE TRIAL",
       paidPlanBtn: "Buy Package",
-
-      // 8. FAQ
       faqTitle: "Frequently Asked Questions",
-
-      // 9. FINAL CTA
       ctaTitle: "Your first step to Band 7.5+",
       ctaSub: "You have nothing to lose, but a better future to gain.",
       ctaBtn: "START FREE SPEAKING MOCK",
-
       stuTitle: "For Self-Study Students",
-
       priceCards: {
           one: { title: "1st Exam", desc: "Trial", price: "FREE", valueProp: "Risk-free start. Full analysis included." },
           five: { title: "5 Exams", desc: "Intensive", price: "39,000 UZS", valueProp: "Popular. Only 7,800 UZS per exam." },
@@ -237,7 +199,6 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
 
       {/* 1. HERO SECTION */}
       <header className="relative z-10 max-w-7xl mx-auto px-6 pt-16 pb-20 text-center lg:text-left flex flex-col lg:flex-row items-center gap-12 overflow-hidden">
-          {/* Background Ambient Blobs */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-cyan-500/10 rounded-full blur-[120px] -z-10 dark:bg-cyan-900/20"></div>
 
           <div className="lg:w-1/2 relative z-10">
@@ -264,10 +225,17 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
                   >
                       {text.startBtn} &rarr;
                   </button>
-                  <p className="text-xs text-slate-500 dark:text-slate-500 font-medium max-w-[200px] leading-tight text-center sm:text-left">
-                      {text.noCard}
-                  </p>
+                  {/* SAMPLE REPORT BUTTON */}
+                  <button 
+                    onClick={() => setShowSample(true)}
+                    className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 px-8 py-4 rounded-xl font-bold text-lg transition-all"
+                  >
+                      {text.sampleBtn}
+                  </button>
               </div>
+              <p className="text-xs text-slate-500 dark:text-slate-500 font-medium mt-4 text-center sm:text-left">
+                  {text.noCard}
+              </p>
           </div>
 
           <div className="lg:w-1/2 w-full relative group perspective-1000">
@@ -296,6 +264,72 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
                </div>
           </div>
       </header>
+
+      {/* SAMPLE REPORT MODAL */}
+      {showSample && (
+          <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in overflow-y-auto">
+              <div className="bg-slate-900 rounded-3xl w-full max-w-2xl border border-slate-800 shadow-2xl overflow-hidden relative my-8">
+                  <div className="bg-gradient-to-r from-cyan-600 to-blue-600 p-6 flex justify-between items-center">
+                      <h3 className="text-white font-bold text-xl">🚀 Sample Band 7.5 Report</h3>
+                      <button onClick={() => setShowSample(false)} className="text-white/80 hover:text-white bg-white/10 rounded-full p-2">✕</button>
+                  </div>
+                  <div className="p-6 md:p-8 space-y-6">
+                      {/* Overall Score */}
+                      <div className="text-center mb-8">
+                          <div className="text-6xl font-extrabold text-white mb-2">7.5</div>
+                          <div className="text-sm text-cyan-400 uppercase tracking-widest font-bold">Overall Band Score</div>
+                      </div>
+                      
+                      {/* Sub Scores */}
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                              <div className="text-green-400 font-bold text-2xl">8.0</div>
+                              <div className="text-xs text-slate-500 uppercase">Fluency</div>
+                          </div>
+                          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                              <div className="text-yellow-400 font-bold text-2xl">7.5</div>
+                              <div className="text-xs text-slate-500 uppercase">Lexical</div>
+                          </div>
+                          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                              <div className="text-blue-400 font-bold text-2xl">6.5</div>
+                              <div className="text-xs text-slate-500 uppercase">Grammar</div>
+                          </div>
+                          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                              <div className="text-purple-400 font-bold text-2xl">7.5</div>
+                              <div className="text-xs text-slate-500 uppercase">Pronunciation</div>
+                          </div>
+                      </div>
+
+                      {/* Coach Tip */}
+                      <div className="bg-indigo-900/30 border border-indigo-500/30 p-5 rounded-xl">
+                          <h4 className="text-indigo-400 font-bold text-sm mb-2 flex items-center gap-2">💡 AI Coach Tip:</h4>
+                          <p className="text-slate-300 text-sm italic">"Your fluency is great, but you struggle with complex grammar structures in Part 3. Use more passive voice and conditional sentences."</p>
+                      </div>
+
+                      {/* Vocabulary Improvement */}
+                      <div>
+                          <h4 className="text-white font-bold mb-3 text-sm uppercase">Vocabulary Upgrades</h4>
+                          <div className="space-y-2">
+                              <div className="flex justify-between items-center text-sm p-3 bg-slate-950 rounded-lg border border-slate-800">
+                                  <span className="text-red-400 line-through">Very good</span>
+                                  <span className="text-green-400 font-bold">Exceptional / Outstanding</span>
+                              </div>
+                              <div className="flex justify-between items-center text-sm p-3 bg-slate-950 rounded-lg border border-slate-800">
+                                  <span className="text-red-400 line-through">I think</span>
+                                  <span className="text-green-400 font-bold">From my perspective</span>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-800">
+                          <button onClick={onStart} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-cyan-500/20">
+                              Get My Real Report
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {/* 2. PROBLEM AGITATION - Better Typography */}
       <section className="bg-slate-50 dark:bg-slate-900 py-20 border-y border-slate-200 dark:border-slate-800">
@@ -454,7 +488,7 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
           </div>
       </section>
 
-      {/* 8. PRICING - IMPROVED FOR CONVERSION */}
+      {/* 8. PRICING */}
       <section id="pricing" className="py-24 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
           <div className="max-w-6xl mx-auto px-6">
               <div className="text-center mb-16">
@@ -547,7 +581,7 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
           </div>
       </section>
 
-      {/* 10. FINAL CTA - Clean & Urgent */}
+      {/* 10. FINAL CTA */}
       <section className="py-28 text-center relative overflow-hidden bg-slate-900">
           <div className="absolute inset-0 bg-gradient-to-t from-cyan-900/30 to-transparent pointer-events-none"></div>
           <div className="relative z-10 max-w-3xl mx-auto px-6">
@@ -563,7 +597,7 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
           </div>
       </section>
 
-      {/* FOOTER - Complete */}
+      {/* FOOTER */}
       <footer className="bg-slate-950 border-t border-slate-900 pt-16 pb-10 text-sm text-slate-500">
           <div className="max-w-7xl mx-auto px-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
@@ -575,13 +609,7 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
                       <p className="mb-4 text-xs leading-relaxed">
                           SpeakPro - bu sun'iy intellekt yordamida IELTS Speaking imtihoniga tayyorlovchi zamonaviy platforma.
                       </p>
-                      <div className="flex gap-4">
-                          {/* Social Icons Placeholders */}
-                          <a href="#" className="w-8 h-8 rounded bg-slate-900 flex items-center justify-center hover:bg-slate-800 transition-colors">TG</a>
-                          <a href="#" className="w-8 h-8 rounded bg-slate-900 flex items-center justify-center hover:bg-slate-800 transition-colors">IG</a>
-                      </div>
                   </div>
-                  
                   <div>
                       <h4 className="text-white font-bold mb-4 uppercase text-xs tracking-wider">Product</h4>
                       <ul className="space-y-2">
@@ -590,54 +618,26 @@ const Landing: React.FC<LandingProps> = ({ onStart }) => {
                           <li><a href="#" onClick={onStart} className="hover:text-cyan-400 transition-colors">Free Trial</a></li>
                       </ul>
                   </div>
-
                   <div>
                       <h4 className="text-white font-bold mb-4 uppercase text-xs tracking-wider">Resources</h4>
                       <ul className="space-y-2">
                           <li><a href="#" className="hover:text-cyan-400 transition-colors">Blog</a></li>
                           <li><a href="#" className="hover:text-cyan-400 transition-colors">IELTS Tips</a></li>
-                          <li><a href="#" className="hover:text-cyan-400 transition-colors">Band Descriptors</a></li>
                       </ul>
                   </div>
-
                   <div>
                       <h4 className="text-white font-bold mb-4 uppercase text-xs tracking-wider">Company</h4>
                       <ul className="space-y-2">
                           <li><a href="#" className="hover:text-cyan-400 transition-colors">About Us</a></li>
                           <li><a href="#" className="hover:text-cyan-400 transition-colors">Contact</a></li>
-                          <li><a href="#" className="hover:text-cyan-400 transition-colors">Privacy Policy</a></li>
                       </ul>
                   </div>
               </div>
-              
               <div className="border-t border-slate-900 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs">
                   <p>&copy; {new Date().getFullYear()} SpeakPro AI. All rights reserved.</p>
-                  <div className="flex gap-6">
-                      <a href="#" className="hover:text-white transition-colors">Terms</a>
-                      <a href="#" className="hover:text-white transition-colors">Privacy</a>
-                  </div>
               </div>
           </div>
       </footer>
-
-      {/* VIDEO MODAL (Lazy Loaded) */}
-      {showVideo && (
-          <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowVideo(false)}>
-              <div className="relative w-full max-w-4xl aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-800">
-                  <button onClick={() => setShowVideo(false)} className="absolute top-4 right-4 text-white hover:text-red-500 text-2xl z-10 bg-black/50 rounded-full w-8 h-8 flex items-center justify-center">✕</button>
-                  <iframe 
-                    width="100%" 
-                    height="100%" 
-                    src="https://www.youtube.com/embed/sRFEVf5eT_E?autoplay=1" 
-                    title="IELTS Speaking Demo" 
-                    frameBorder="0" 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                    allowFullScreen
-                  ></iframe>
-              </div>
-          </div>
-      )}
-
     </div>
   );
 };
