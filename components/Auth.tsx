@@ -25,7 +25,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     const [forgotEmail, setForgotEmail] = useState('');
 
     // FIXED: Read from .env file (Vite standard) or fallback to placeholder
-    // NOTE: Use (import.meta as any) to avoid TS errors if types aren't set up
     const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
 
     const [formData, setFormData] = useState({
@@ -35,7 +34,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         email: '',
         password: '',
         currentLevel: '',
-        targetLevel: ''
+        targetLevel: '',
+        examDate: '' // NEW FIELD
     });
 
     // INITIALIZE GOOGLE BUTTON
@@ -54,19 +54,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                     // Render
                     const btn = document.getElementById('google-btn-wrapper');
                     if (btn) {
-                        // Clear previous content to avoid duplicates
                         btn.innerHTML = '';
-
                         window.google.accounts.id.renderButton(btn, {
                             theme: 'filled_blue',
                             size: 'large',
                             type: 'standard',
-                            // Note: Google Sign-In button width does NOT support '100%'. 
-                            // It must be a pixel value (integer or string) or left undefined.
-                            // We leave it undefined or set a specific pixel width if needed.
                             text: isLogin ? 'signin_with' : 'signup_with',
                             logo_alignment: 'left',
-                            width: '350' // Optional: forcing a wide button (max is usually around 400px)
+                            width: '350'
                         });
                     }
                 } catch (e) {
@@ -77,9 +72,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             return false;
         };
 
-        // Attempt to render immediately
         if (!renderGoogleButton()) {
-            // If script not loaded yet, poll for it
             const intervalId = setInterval(() => {
                 if (renderGoogleButton()) {
                     clearInterval(intervalId);
@@ -106,7 +99,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             if (!res.ok) throw new Error(data.message || "Google Login Failed");
 
             saveUser(data);
-            // ANALYTICS: Track Google Login/Signup
             trackEvent(isLogin ? 'login' : 'sign_up', { method: 'google', email: data.email });
 
             onLogin(data);
@@ -139,6 +131,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         if (!isLogin && !isTeacher) {
             if (!formData.currentLevel) return "Iltimos, hozirgi darajangizni tanlang.";
             if (!formData.targetLevel) return "Iltimos, maqsad qilgan darajangizni tanlang.";
+            // Exam Date is optional but recommended
         }
         return null;
     };
@@ -231,7 +224,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         }
     };
 
-    // FORGOT PASSWORD MODAL
     if (showForgot) {
         return (
             <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm fixed inset-0 z-50">
@@ -275,7 +267,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             <div className="glass-card w-full max-w-lg p-8 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700/50 relative z-10 bg-white/70 dark:bg-slate-900/70">
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 mb-4 shadow-[0_0_15px_rgba(0,243,255,0.3)] animate-glow">
-                        {/* UPDATED LOGO: MICROPHONE (Matches Landing Page) */}
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                         </svg>
@@ -299,9 +290,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                     </button>
                 </div>
 
-                {/* GOOGLE BUTTON CONTAINER */}
                 <div className="w-full mb-4 flex justify-center">
-                    {/* Wrapper width fixed to prevent layout shift */}
                     <div id="google-btn-wrapper" className="min-h-[40px] w-[350px] flex justify-center overflow-hidden"></div>
                 </div>
 
@@ -314,12 +303,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {!isLogin && (
                         <>
-                            {/* FREE EXAM PROMO BANNER */}
                             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold p-3 rounded-lg text-center animate-pulse">
                                 🎁 Hoziroq ro'yxatdan o'ting va 1 ta BEPUL imtihon oling!
                             </div>
 
-                            {/* B2B Toggle */}
                             <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700 mb-2">
                                 <div
                                     onClick={() => setIsTeacher(!isTeacher)}
@@ -334,27 +321,27 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="group">
-                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 group-focus-within:text-cyan-600 dark:group-focus-within:text-cyan-400 transition-colors">
+                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
                                         {isTeacher ? "Markaz Nomi" : "Ism"}
                                     </label>
-                                    <input required type="text" name="firstName" value={formData.firstName} onChange={handleChange} className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-slate-400 dark:placeholder-slate-600" placeholder="John" />
+                                    <input required type="text" name="firstName" value={formData.firstName} onChange={handleChange} className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white outline-none" placeholder="John" />
                                 </div>
                                 <div className="group">
-                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 group-focus-within:text-cyan-600 dark:group-focus-within:text-cyan-400 transition-colors">
+                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
                                         {isTeacher ? "Mas'ul Shaxs" : "Familiya"}
                                     </label>
-                                    <input required type="text" name="lastName" value={formData.lastName} onChange={handleChange} className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-slate-400 dark:placeholder-slate-600" placeholder="Doe" />
+                                    <input required type="text" name="lastName" value={formData.lastName} onChange={handleChange} className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white outline-none" placeholder="Doe" />
                                 </div>
                             </div>
                             <div className="group">
-                                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 group-focus-within:text-cyan-600 dark:group-focus-within:text-cyan-400 transition-colors">Telefon (+998...)</label>
+                                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Telefon (+998...)</label>
                                 <input
                                     required
                                     type="tel"
                                     name="phone"
                                     value={formData.phone}
                                     onChange={handleChange}
-                                    className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-slate-400 dark:placeholder-slate-600 font-mono"
+                                    className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white outline-none"
                                     placeholder="+998901234567"
                                 />
                             </div>
@@ -362,22 +349,55 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                     )}
 
                     <div className="group">
-                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 group-focus-within:text-cyan-600 dark:group-focus-within:text-cyan-400 transition-colors">Email</label>
+                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email</label>
                         <input
                             required
                             type="email"
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
-                            className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-slate-400 dark:placeholder-slate-600"
+                            className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white outline-none"
                             placeholder="name@example.com"
                         />
                     </div>
 
                     <div className="group">
-                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 group-focus-within:text-cyan-600 dark:group-focus-within:text-cyan-400 transition-colors">Parol</label>
-                        <input required type="password" name="password" value={formData.password} onChange={handleChange} className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all placeholder-slate-400 dark:placeholder-slate-600" placeholder="••••••••" />
+                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Parol</label>
+                        <input required type="password" name="password" value={formData.password} onChange={handleChange} className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white outline-none" placeholder="••••••••" />
                     </div>
+
+                    {!isLogin && !isTeacher && (
+                        <>
+                            <div className="grid grid-cols-2 gap-4 pt-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Hozirgi daraja</label>
+                                    <select required name="currentLevel" value={formData.currentLevel} onChange={handleChange} className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white outline-none">
+                                        <option value="" disabled>Tanlang...</option>
+                                        {['4.0', '5.0', '5.5', '6.0', '6.5', '7.0', '7.5', '8.0'].map(l => <option key={l} value={l} className="bg-white dark:bg-slate-900">{l}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Maqsad</label>
+                                    <select required name="targetLevel" value={formData.targetLevel} onChange={handleChange} className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white outline-none">
+                                        <option value="" disabled>Tanlang...</option>
+                                        {['5.0', '6.0', '6.5', '7.0', '7.5', '8.0', '8.5', '9.0'].map(l => <option key={l} value={l} className="bg-white dark:bg-slate-900">{l}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="pt-2">
+                                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Imtihon sanasi (Taxminiy)</label>
+                                <input
+                                    type="date"
+                                    name="examDate"
+                                    value={formData.examDate}
+                                    onChange={handleChange}
+                                    className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white outline-none"
+                                />
+                                <p className="text-[10px] text-slate-500 mt-1">Shunga qarab sizga "Smart Study Plan" tuzib beramiz.</p>
+                            </div>
+                        </>
+                    )}
 
                     {isLogin && (
                         <div className="text-right">
@@ -387,28 +407,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                         </div>
                     )}
 
-                    {!isLogin && !isTeacher && (
-                        <div className="grid grid-cols-2 gap-4 pt-2">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Hozirgi daraja</label>
-                                <select required name="currentLevel" value={formData.currentLevel} onChange={handleChange} className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white outline-none cursor-pointer">
-                                    <option value="" disabled>Tanlang...</option>
-                                    {['4.0', '5.0', '5.5', '6.0', '6.5', '7.0', '7.5', '8.0'].map(l => <option key={l} value={l} className="bg-white dark:bg-slate-900">{l}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Maqsad</label>
-                                <select required name="targetLevel" value={formData.targetLevel} onChange={handleChange} className="w-full bg-white dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2.5 text-slate-900 dark:text-white outline-none cursor-pointer">
-                                    <option value="" disabled>Tanlang...</option>
-                                    {['5.0', '6.0', '6.5', '7.0', '7.5', '8.0', '8.5', '9.0'].map(l => <option key={l} value={l} className="bg-white dark:bg-slate-900">{l}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                    )}
-
                     {error && (
                         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/50 rounded-lg p-3 flex items-start gap-3">
-                            <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
                         </div>
                     )}
@@ -416,14 +416,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                     <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3.5 rounded-lg transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)] mt-4 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed group">
                         <span className="relative z-10 flex items-center justify-center gap-2">
                             {loading ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    Yuklanmoqda...
-                                </>
+                                <>Yuklanmoqda...</>
                             ) : (
                                 <>
-                                    {isLogin ? 'TIZIMGA KIRISH' : (isTeacher ? 'MARKAZ OCHISH' : 'TEKIN START')}
-                                    <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                                    {isLogin ? 'TIZIMGA KIRISH' : (isTeacher ? 'MARKAZ OCHISH' : 'PLAN TUZISH VA BOSHLASH')}
                                 </>
                             )}
                         </span>
