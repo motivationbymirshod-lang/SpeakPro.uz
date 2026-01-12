@@ -8,7 +8,7 @@ import { SELF_TARIFFS } from '../config/selfTariffs';
 
 interface DashboardProps {
     user: UserProfile;
-    onStartExam: () => void;
+    onStartExam: (mode: 'random' | 'forecast') => void;
     onLogout: () => void;
 }
 
@@ -24,6 +24,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
     const [showDictionary, setShowDictionary] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showStudentModal, setShowStudentModal] = useState(false); // B2B check
+    const [showTopicModal, setShowTopicModal] = useState(false); // NEW: Topic Selector
     
     // Async Actions
     const [purchasing, setPurchasing] = useState(false);
@@ -66,7 +67,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
     useEffect(() => {
         refreshUser();
         
-        // Mock Streak Logic
+        // Mock Streak Logic (Simple Days since join)
         const daysSinceJoin = Math.floor((new Date().getTime() - new Date(user.joinedAt || Date.now()).getTime()) / (1000 * 3600 * 24));
         setStreak(daysSinceJoin > 0 ? daysSinceJoin + 1 : 1);
 
@@ -101,7 +102,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
         return () => { clearInterval(ticker); clearInterval(offer); };
     }, []);
 
-    // Exam Date Countdown
     useEffect(() => {
         if (!examDate) return;
         const interval = setInterval(() => {
@@ -171,12 +171,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
         finally { setIsSavingPass(false); }
     };
 
-    const handleStartExam = (e: React.MouseEvent) => {
+    // Pre-check before opening modal
+    const handleStartClick = (e: React.MouseEvent) => {
         e.preventDefault();
         
         // B2B Check
         if (user.teacherId) {
-            if (user.examsLeft && user.examsLeft > 0) onStartExam();
+            if (user.examsLeft && user.examsLeft > 0) setShowTopicModal(true);
             else setShowStudentModal(true);
             return;
         }
@@ -188,8 +189,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
             return;
         }
 
-        if (hasCredits) onStartExam();
+        if (hasCredits) setShowTopicModal(true);
         else setShowPayment(true);
+    };
+
+    // Actual Start from Modal
+    const confirmStartExam = (mode: 'random' | 'forecast') => {
+        setShowTopicModal(false);
+        onStartExam(mode);
     };
 
     const handleBuyPlan = async (planId: string) => {
@@ -246,7 +253,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
 
             <div className="max-w-7xl mx-auto p-4 md:p-8">
                 {/* 2. HEADER & NAVBAR */}
-                <header className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+                <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
                     <div className="flex items-center gap-4 w-full md:w-auto">
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-xl relative ${isPro ? 'bg-gradient-to-br from-yellow-500 to-orange-600' : 'bg-gradient-to-br from-cyan-600 to-blue-600'}`}>
                             {user.firstName[0]}
@@ -299,7 +306,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                     </div>
                 </header>
 
-                {/* 3. SKILL TREE (THE "GYM" FEATURE) - REPLACES PROGRESS BAR */}
+                {/* 3. SKILL TREE (The "Gym") */}
                 <div className="mb-10 animate-fade-in-up">
                     <div className="flex justify-between items-end mb-4">
                         <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -338,7 +345,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                     </div>
                 </div>
 
-                {/* 4. NOTIFICATIONS (Email / Teacher) */}
+                {/* 4. NOTIFICATIONS */}
                 {isManagedStudent && user.homework && !user.homework.isCompleted && (
                     <div className="mb-6 bg-indigo-900/20 border border-indigo-500/30 rounded-2xl p-6 relative overflow-hidden animate-fade-in-up">
                         <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] px-3 py-1 rounded-bl-xl font-bold uppercase">Yangi Vazifa</div>
@@ -363,12 +370,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                     </div>
                 )}
 
-                {/* 5. MAIN ACTION GRID (EXAM + DRILLS + DICTIONARY) */}
+                {/* 5. GAMIFICATION & MAIN ACTIONS */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                    
                     {/* A. START EXAM (Big Card) */}
-                    <div onClick={handleStartExam} role="button" className="lg:col-span-1 relative overflow-hidden rounded-3xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white p-8 cursor-pointer shadow-2xl shadow-cyan-500/20 group transform transition-all hover:scale-[1.01]">
+                    <div onClick={handleStartClick} role="button" className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white p-8 cursor-pointer shadow-2xl shadow-cyan-500/20 group transform transition-all hover:scale-[1.01]">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                        <div className="relative z-10 flex flex-col justify-between h-full min-h-[220px]">
+                        <div className="relative z-10 flex flex-col justify-between h-full min-h-[200px]">
                             <div>
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-bold backdrop-blur-sm border border-white/10">AI EXAMINER 3.0</div>
@@ -386,16 +394,61 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                         </div>
                     </div>
 
-                    {/* B. DAILY DRILLS & DICTIONARY (New "Gym" Features) */}
+                    {/* B. DAILY CHALLENGE (Gamification) */}
+                    <div className="lg:col-span-1 bg-purple-900/20 border border-purple-500/30 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
+                        <div>
+                            <div className="flex justify-between items-start mb-2">
+                                <span className="text-xs font-bold text-purple-400 uppercase tracking-widest">Daily Quest</span>
+                                <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded">NEW</span>
+                            </div>
+                            <h3 className="text-lg font-bold text-white mb-2">Part 1 Challenge</h3>
+                            <p className="text-xs text-slate-400">Javob bering: "Do you prefer working alone or in a group?"</p>
+                        </div>
+                        <button onClick={() => setShowDrill(true)} className="mt-4 w-full bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-xl font-bold text-sm shadow-lg shadow-purple-500/20 transition-colors">
+                            Answer Now (+10 XP)
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                    {/* C. LEADERBOARD (Gamification) */}
+                    <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-3xl p-6">
+                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                            <span>🏆</span> Top Students (This Week)
+                        </h3>
+                        <div className="space-y-3">
+                            {[
+                                { n: "Malika S.", s: "7.5", x: "🔥" },
+                                { n: "Jamshid K.", s: "7.0", x: "⚡" },
+                                { n: "Sardor B.", s: "7.0", x: "🚀" }
+                            ].map((s, i) => (
+                                <div key={i} className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i===0?'bg-yellow-500 text-black': 'bg-slate-700 text-slate-300'}`}>{i+1}</div>
+                                        <span className="text-sm text-slate-300">{s.n}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-cyan-400">{s.s}</span>
+                                        <span className="text-xs">{s.x}</span>
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="text-center pt-2">
+                                <span className="text-xs text-slate-500">You are in top 15%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* D. DRILLS & DICTIONARY */}
                     <div className="lg:col-span-2 grid md:grid-cols-2 gap-6">
                         <div onClick={() => setShowDrill(true)} className="bg-slate-900 border border-slate-800 p-6 rounded-3xl cursor-pointer hover:border-purple-500 transition-colors group relative overflow-hidden">
                             <div className="absolute inset-0 bg-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             <div className="flex justify-between items-start mb-4">
                                 <div className="w-12 h-12 bg-purple-900/30 rounded-xl flex items-center justify-center text-purple-400 text-2xl border border-purple-500/20">🏋️‍♀️</div>
-                                <span className="text-[10px] bg-purple-900/50 text-purple-300 px-3 py-1 rounded-full font-bold uppercase">Quick Workout</span>
+                                <span className="text-[10px] bg-purple-900/50 text-purple-300 px-3 py-1 rounded-full font-bold uppercase">Micro-Drill</span>
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-2">Daily Paraphrasing</h3>
-                            <p className="text-xs text-slate-400 leading-relaxed">2 daqiqalik intensiv mashq. So'z boyligini oshirish uchun.</p>
+                            <h3 className="text-xl font-bold text-white mb-2">Audio Workout</h3>
+                            <p className="text-xs text-slate-400 leading-relaxed">Listen and repeat. Perfect your pronunciation in 2 mins.</p>
                         </div>
 
                         <div onClick={() => setShowDictionary(true)} className="bg-slate-900 border border-slate-800 p-6 rounded-3xl cursor-pointer hover:border-yellow-500 transition-colors group relative overflow-hidden">
@@ -430,7 +483,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                     </div>
                 )}
 
-                {/* 7. SHOP SECTION (Restored) */}
+                {/* 7. SHOP SECTION */}
                 {!isManagedStudent && (
                     <div className="mb-12">
                         <div className="flex items-center justify-between mb-6">
@@ -481,6 +534,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                 {showPayment && <PaymentModal user={user} onClose={() => setShowPayment(false)} />}
                 {showDrill && <DrillModal onClose={() => setShowDrill(false)} />}
                 
+                {/* TOPIC SELECTION MODAL */}
+                {showTopicModal && (
+                    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+                        <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-purple-500"></div>
+                            
+                            <h3 className="text-2xl font-bold text-white mb-6 text-center">Select Exam Topic</h3>
+                            
+                            <div className="grid gap-4 mb-6">
+                                <button onClick={() => confirmStartExam('random')} className="flex items-center gap-4 p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-cyan-500 transition-all group">
+                                    <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center text-2xl group-hover:bg-cyan-900/30">🎲</div>
+                                    <div className="text-left">
+                                        <div className="font-bold text-white text-lg">Random Topics</div>
+                                        <div className="text-slate-500 text-xs">Standard mix of common IELTS questions.</div>
+                                    </div>
+                                </button>
+
+                                <button onClick={() => confirmStartExam('forecast')} className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-purple-900/20 to-slate-900 border border-purple-500/50 hover:border-purple-400 transition-all group relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 bg-purple-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl">HOT</div>
+                                    <div className="w-12 h-12 bg-purple-900/50 rounded-full flex items-center justify-center text-2xl border border-purple-500/30">🔥</div>
+                                    <div className="text-left">
+                                        <div className="font-bold text-white text-lg">Jan-Apr 2025 Forecast</div>
+                                        <div className="text-slate-400 text-xs">Most recent questions reported by students.</div>
+                                    </div>
+                                </button>
+                            </div>
+
+                            <button onClick={() => setShowTopicModal(false)} className="w-full text-slate-500 hover:text-white text-sm">Cancel</button>
+                        </div>
+                    </div>
+                )}
+
                 {showDictionary && (
                     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex justify-end">
                         <div className="w-full md:w-[400px] h-full bg-slate-900 border-l border-slate-800 p-6 flex flex-col animate-fade-in">
