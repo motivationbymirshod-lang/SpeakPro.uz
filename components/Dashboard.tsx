@@ -15,7 +15,6 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, onLogout }) => {
     // --- STATE MANAGEMENT ---
     const [user, setUser] = useState(initialUser);
-    const [history, setHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     
     // UI Toggles
@@ -23,90 +22,84 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
     const [showDrill, setShowDrill] = useState(false);
     const [showDictionary, setShowDictionary] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const [showStudentModal, setShowStudentModal] = useState(false); // B2B check
-    const [showTopicModal, setShowTopicModal] = useState(false); // NEW: Topic Selector
+    const [showStudentModal, setShowStudentModal] = useState(false);
+    const [showTopicModal, setShowTopicModal] = useState(false);
     
+    // Emergency & Planning
+    const [emergencyMode, setEmergencyMode] = useState(false);
+    const [examDate, setExamDate] = useState<string>(user.examDate || localStorage.getItem('target_exam_date') || '');
+    const [timeLeft, setTimeLeft] = useState<string>('');
+    const [dailyTasks, setDailyTasks] = useState<any[]>([]);
+
     // Async Actions
     const [purchasing, setPurchasing] = useState(false);
     const [verifyingEmail, setVerifyingEmail] = useState(false);
     const [isSavingPass, setIsSavingPass] = useState(false);
     const [newPassword, setNewPassword] = useState('');
 
-    // Growth Data
-    const [dictionary, setDictionary] = useState<DictionaryItem[]>(user.dictionary || []);
-    const [roadmapStep, setRoadmapStep] = useState(1);
-    const [streak, setStreak] = useState(1);
-
     // Marketing Triggers
-    const [examDate, setExamDate] = useState<string | null>(localStorage.getItem('target_exam_date'));
-    const [timeLeft, setTimeLeft] = useState<string>('');
-    const [offerTime, setOfferTime] = useState(900); // 15 min offer
+    const [dictionary, setDictionary] = useState<DictionaryItem[]>(user.dictionary || []);
+    const [streak, setStreak] = useState(1);
+    const [offerTime, setOfferTime] = useState(900); 
     const [liveMsg, setLiveMsg] = useState("Azizbek just scored Band 7.5 🎉");
-
-    // --- LOGIC ---
 
     const refreshUser = async () => {
         try {
-            // Heartbeat
-            fetch('https://speakpro-uz.onrender.com/api/user/heartbeat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: user.email })
-            }).catch(() => { });
-
             const res = await fetch(`https://speakpro-uz.onrender.com/api/user/${user.email}`);
             if (res.ok) {
                 const updatedUser = await res.json();
                 setUser(updatedUser);
                 setDictionary(updatedUser.dictionary || []);
+                if(updatedUser.examDate) setExamDate(new Date(updatedUser.examDate).toISOString().split('T')[0]);
                 saveUser(updatedUser);
             }
         } catch (e) { console.error(e); }
     };
 
+    // GENERATE STUDY PLAN
     useEffect(() => {
-        refreshUser();
-        
-        // Mock Streak Logic (Simple Days since join)
-        const daysSinceJoin = Math.floor((new Date().getTime() - new Date(user.joinedAt || Date.now()).getTime()) / (1000 * 3600 * 24));
-        setStreak(daysSinceJoin > 0 ? daysSinceJoin + 1 : 1);
+        if (!examDate) {
+            setDailyTasks([
+                { day: "Day 1", task: "Take Diagnostic Mock", status: "pending" },
+                { day: "Day 2", task: "Set Exam Date to unlock Plan", status: "locked" }
+            ]);
+            return;
+        }
 
-        // Fetch History
-        fetch(`https://speakpro-uz.onrender.com/api/history?email=${user.email}`)
-            .then(res => res.json())
-            .then(data => {
-                setHistory(data);
-                // Calculate Roadmap Step based on history count
-                const examsTaken = data.length || 0;
-                setRoadmapStep(Math.min(5, examsTaken + 1));
-            })
-            .catch(console.error)
-            .finally(() => setLoading(false));
+        const today = new Date();
+        const target = new Date(examDate);
+        const diffDays = Math.ceil((target.getTime() - today.getTime()) / (1000 * 3600 * 24));
 
-        // Marketing Timers
-        const messages = [
-            "Malika PRO paket sotib oldi 🚀",
-            "Jamshid Band 7.0 oldi 👏",
-            "124 student hozir online 🟢",
-            "Shaxzoda 1-imtihonini topshirdi 📝",
-            "Sardor Speakingdan 6.5 dan 7.5 ga chiqdi 📈"
-        ];
-        const ticker = setInterval(() => {
-            setLiveMsg(messages[Math.floor(Math.random() * messages.length)]);
-        }, 5000);
+        if (diffDays <= 3 && !emergencyMode) {
+            // Suggest Emergency Mode
+            // setEmergencyMode(true); // Can prompt user instead
+        }
 
-        const offer = setInterval(() => {
-            setOfferTime(prev => (prev > 0 ? prev - 1 : 0));
-        }, 1000);
+        const tasks = [];
+        const taskTypes = emergencyMode 
+            ? ["Forecast Part 1", "Forecast Part 2", "Vocab Cramming", "Full Mock"]
+            : ["Part 1 Drill", "Listening Shadowing", "Part 2 Simulation", "Part 3 Logic", "Full Mock"];
 
-        return () => { clearInterval(ticker); clearInterval(offer); };
-    }, []);
+        // Generate next 5 days
+        for (let i = 0; i < 5; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() + i);
+            const isToday = i === 0;
+            
+            tasks.push({
+                date: d.toLocaleDateString(),
+                weekday: d.toLocaleDateString('en-US', { weekday: 'short' }),
+                task: taskTypes[i % taskTypes.length],
+                status: isToday ? "active" : "locked",
+                isToday: isToday
+            });
+        }
+        setDailyTasks(tasks);
 
-    useEffect(() => {
-        if (!examDate) return;
+        // Countdown Logic
         const interval = setInterval(() => {
             const now = new Date().getTime();
-            const distance = new Date(examDate).getTime() - now;
+            const distance = target.getTime() - now;
             if (distance < 0) {
                 setTimeLeft("IMTIHON KUNI!");
             } else {
@@ -115,85 +108,50 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [examDate]);
 
-    // --- HANDLERS ---
+    }, [examDate, emergencyMode]);
 
-    const handleSetExamDate = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setExamDate(e.target.value);
-        localStorage.setItem('target_exam_date', e.target.value);
+    useEffect(() => {
+        refreshUser();
+        const daysSinceJoin = Math.floor((new Date().getTime() - new Date(user.joinedAt || Date.now()).getTime()) / (1000 * 3600 * 24));
+        setStreak(daysSinceJoin > 0 ? daysSinceJoin + 1 : 1);
+
+        const ticker = setInterval(() => {
+            setLiveMsg(["Malika PRO paket sotib oldi 🚀", "Jamshid Band 7.0 oldi 👏", "124 student online 🟢"][Math.floor(Math.random()*3)]);
+        }, 5000);
+        const offer = setInterval(() => setOfferTime(prev => (prev > 0 ? prev - 1 : 0)), 1000);
+        return () => { clearInterval(ticker); clearInterval(offer); };
+    }, []);
+
+    const handleSetExamDate = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const d = e.target.value;
+        setExamDate(d);
+        localStorage.setItem('target_exam_date', d);
+        
+        // Save to DB
+        await fetch('https://speakpro-uz.onrender.com/api/user/update-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user._id || user.id, examDate: d })
+        });
     };
 
-    const handleLogout = () => { logoutUser(); onLogout(); };
-
-    const handleVerifyEmail = async () => {
-        setVerifyingEmail(true);
-        try {
-            const res = await fetch('https://speakpro-uz.onrender.com/api/user/send-verification-email', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user._id || user.id })
-            });
-            if (res.ok) alert(`${user.email} ga tasdiqlash havolasini yubordik!`);
-            else alert("Xatolik");
-        } catch (e) { alert("Server xatosi"); }
-        finally { setVerifyingEmail(false); }
-    };
-
-    const handleRemoveWord = async (word: string) => {
-        try {
-            await fetch(`https://speakpro-uz.onrender.com/api/user/dictionary/${user._id}/${word}`, { method: 'DELETE' });
-            setDictionary(prev => prev.filter(w => w.word !== word));
-        } catch(e) { alert("Error removing word"); }
-    };
-
-    const handleUpdatePassword = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if(newPassword.length < 6) {
-            alert("Parol kamida 6 belgidan iborat bo'lishi kerak");
-            return;
-        }
-        setIsSavingPass(true);
-        try {
-            const res = await fetch('https://speakpro-uz.onrender.com/api/user/update-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user._id || user.id, newPassword })
-            });
-            if (res.ok) {
-                alert("Parol yangilandi!");
-                setNewPassword('');
-                setShowSettings(false);
-            } else {
-                alert("Xatolik");
-            }
-        } catch (e) { alert("Xatolik"); }
-        finally { setIsSavingPass(false); }
-    };
-
-    // Pre-check before opening modal
     const handleStartClick = (e: React.MouseEvent) => {
         e.preventDefault();
-        
-        // B2B Check
         if (user.teacherId) {
             if (user.examsLeft && user.examsLeft > 0) setShowTopicModal(true);
             else setShowStudentModal(true);
             return;
         }
-
-        // Free/Paid Check
         const hasCredits = user.examsLeft && user.examsLeft > 0;
         if (!user.hasPaidHistory && !user.hasUsedFreeTrial && !user.isEmailVerified) {
             alert("Bepul imtihonni boshlash uchun avval Emailingizni tasdiqlang.");
             return;
         }
-
         if (hasCredits) setShowTopicModal(true);
         else setShowPayment(true);
     };
 
-    // Actual Start from Modal
     const confirmStartExam = (mode: 'random' | 'forecast') => {
         setShowTopicModal(false);
         onStartExam(mode);
@@ -206,14 +164,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
             case SELF_TARIFFS.FIVE_EXAMS.id: cost = SELF_TARIFFS.FIVE_EXAMS.price; break;
             case SELF_TARIFFS.PRO_SUBSCRIPTION.id: cost = SELF_TARIFFS.PRO_SUBSCRIPTION.price; break;
         }
-
         if (user.balance < cost) {
             setShowPayment(true);
             return;
         }
-
         if (!window.confirm(`Balansdan ${cost.toLocaleString()} so'm yechiladi. Davom etasizmi?`)) return;
-
         setPurchasing(true);
         try {
             const res = await fetch('https://speakpro-uz.onrender.com/api/wallet/purchase-plan', {
@@ -233,20 +188,59 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
         finally { setPurchasing(false); }
     };
 
+    const handleRemoveWord = async (word: string) => {
+        try {
+            const res = await fetch(`https://speakpro-uz.onrender.com/api/user/dictionary/${user._id || user.id}/${word}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                const updatedDict = await res.json();
+                setDictionary(updatedDict);
+                const updatedUser = { ...user, dictionary: updatedDict };
+                setUser(updatedUser);
+                saveUser(updatedUser);
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleUpdatePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newPassword) return;
+        setIsSavingPass(true);
+        try {
+            const res = await fetch('https://speakpro-uz.onrender.com/api/user/update-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user._id || user.id, newPassword })
+            });
+            if (res.ok) {
+                alert("Parol muvaffaqiyatli o'zgartirildi!");
+                setShowSettings(false);
+                setNewPassword('');
+            } else {
+                alert("Xatolik yuz berdi");
+            }
+        } catch (e) { alert("Aloqa yo'q"); }
+        finally { setIsSavingPass(false); }
+    };
+
+    // UI Helpers
     const formatOfferTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
-
+    
+    const handleLogout = () => { logoutUser(); onLogout(); };
     const isPro = user.subscriptionPlan === 'pro';
     const isManagedStudent = !!user.teacherId;
     const showFreeTrialBanner = !isManagedStudent && !user.hasPaidHistory && !user.hasUsedFreeTrial;
 
+    // --- RENDER ---
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-200 pb-20 font-sans selection:bg-cyan-500/30 transition-colors duration-300">
+        <div className={`min-h-screen pb-20 font-sans selection:bg-cyan-500/30 transition-colors duration-300 ${emergencyMode ? 'bg-red-950 text-red-100' : 'bg-slate-950 text-slate-200'}`}>
             {/* 1. LIVE TICKER */}
-            <div className="bg-slate-900 text-slate-400 text-[10px] py-1 text-center border-b border-slate-800 tracking-wider overflow-hidden">
+            <div className={`${emergencyMode ? 'bg-red-900 border-red-800' : 'bg-slate-900 border-slate-800'} text-[10px] py-1 text-center border-b tracking-wider overflow-hidden`}>
                 <span className="animate-pulse inline-block w-2 h-2 bg-green-500 rounded-full mr-2"></span>
                 {liveMsg}
             </div>
@@ -255,19 +249,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                 {/* 2. HEADER & NAVBAR */}
                 <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
                     <div className="flex items-center gap-4 w-full md:w-auto">
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-xl relative ${isPro ? 'bg-gradient-to-br from-yellow-500 to-orange-600' : 'bg-gradient-to-br from-cyan-600 to-blue-600'}`}>
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-xl relative ${emergencyMode ? 'bg-red-600 text-white' : (isPro ? 'bg-gradient-to-br from-yellow-500 to-orange-600 text-white' : 'bg-gradient-to-br from-cyan-600 to-blue-600 text-white')}`}>
                             {user.firstName[0]}
                             {isPro && <div className="absolute -top-2 -right-2 bg-white text-orange-600 text-[10px] px-2 py-0.5 rounded-full font-bold border border-orange-100 uppercase">PRO</div>}
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-white">Salom, <span className={isPro ? "text-yellow-400" : "text-cyan-400"}>{user.firstName}</span></h1>
+                            <h1 className="text-2xl font-bold text-white">Salom, <span className={emergencyMode ? "text-red-400" : (isPro ? "text-yellow-400" : "text-cyan-400")}>{user.firstName}</span></h1>
                             <div className="flex items-center gap-3 mt-1">
-                                <p className="text-xs text-slate-400 flex items-center gap-1">
+                                <p className="text-xs opacity-70 flex items-center gap-1">
                                     <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
                                     Target: {user.targetLevel}
                                 </p>
                                 {/* EXAM DATE */}
-                                <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg px-2 py-0.5 relative group cursor-pointer hover:border-red-500 transition-colors">
+                                <div className={`flex items-center gap-2 border rounded-lg px-2 py-0.5 relative group cursor-pointer transition-colors ${emergencyMode ? 'bg-red-900 border-red-700' : 'bg-slate-900 border-slate-800 hover:border-red-500'}`}>
                                     {timeLeft ? (
                                         <span className="text-[10px] font-bold text-red-400 animate-pulse uppercase tracking-wide">⏳ {timeLeft}</span>
                                     ) : (
@@ -280,16 +274,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                     </div>
 
                     <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                        {/* Streak */}
-                        <div className="bg-orange-900/10 border border-orange-500/20 px-4 py-2 rounded-xl flex items-center gap-2">
-                            <span className="text-xl">🔥</span>
-                            <div>
-                                <div className="text-[10px] text-orange-400 font-bold uppercase leading-none">Streak</div>
-                                <div className="text-sm font-bold text-white leading-none">{streak} kun</div>
-                            </div>
-                        </div>
+                        {/* Emergency Toggle */}
+                        <button 
+                            onClick={() => setEmergencyMode(!emergencyMode)}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${emergencyMode ? 'bg-red-600 border-red-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-red-500 hover:border-red-500'}`}
+                        >
+                            {emergencyMode ? '⚠️ PANIC MODE ON' : '🚨 EMERGENCY MODE'}
+                        </button>
 
-                        {/* Balance */}
                         {!isManagedStudent && (
                             <div onClick={() => setShowPayment(true)} className="cursor-pointer bg-slate-900 border border-slate-700 hover:border-cyan-500 px-5 py-2.5 rounded-xl flex items-center gap-3 transition-all group">
                                 <div className="text-right">
@@ -298,103 +290,67 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                 </div>
                             </div>
                         )}
-
-                        <button onClick={() => setShowSettings(true)} className="bg-slate-900 border border-slate-700 p-3 rounded-xl hover:bg-slate-800 transition-colors text-slate-400 hover:text-white">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        </button>
-                        <button onClick={handleLogout} className="text-xs font-bold text-slate-500 hover:text-red-400 transition-colors border border-slate-800 px-5 py-3 rounded-xl hover:bg-slate-900">CHIQISH</button>
+                        <button onClick={handleLogout} className="text-xs font-bold text-slate-500 hover:text-red-400 transition-colors border border-slate-800 px-5 py-3 rounded-xl hover:bg-slate-900">EXIT</button>
                     </div>
                 </header>
 
-                {/* 3. SKILL TREE (The "Gym") */}
+                {/* 3. SMART STUDY PLAN (Timeline) */}
                 <div className="mb-10 animate-fade-in-up">
                     <div className="flex justify-between items-end mb-4">
                         <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            <span className="text-2xl">🗺️</span> Your Road to Band {user.targetLevel}
+                            <span className="text-2xl">{emergencyMode ? '🔥' : '📅'}</span> 
+                            {emergencyMode ? "INTENSIVE CRASH COURSE" : "Smart Study Plan"}
                         </h2>
-                        <span className="text-xs text-slate-500 font-mono">Current Phase: {roadmapStep}/5</span>
+                        <span className="text-xs opacity-60 font-mono">{examDate ? `Target: ${examDate}` : "Set date to activate"}</span>
                     </div>
                     
-                    <div className="relative">
-                        <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-800 -translate-y-1/2 rounded-full z-0 hidden md:block"></div>
-                        <div className="absolute top-1/2 left-0 h-1 bg-cyan-600 -translate-y-1/2 rounded-full z-0 hidden md:block transition-all duration-1000" style={{ width: `${(roadmapStep-1)*25}%` }}></div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative z-10">
-                            {[
-                                { id: 1, title: "Diagnostic", status: "Done" },
-                                { id: 2, title: "Fluency Base", status: "In Progress" },
-                                { id: 3, title: "Vocab Expansion", status: "Locked" },
-                                { id: 4, title: "Grammar Range", status: "Locked" },
-                                { id: 5, title: "Final Polish", status: "Locked" }
-                            ].map((step) => {
-                                const isCompleted = roadmapStep > step.id;
-                                const isCurrent = roadmapStep === step.id;
-                                return (
-                                    <div key={step.id} className={`flex md:flex-col items-center gap-4 md:gap-2 p-4 rounded-xl border transition-all duration-300 ${isCurrent ? 'bg-slate-900 border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.15)] scale-105' : (isCompleted ? 'bg-slate-900/50 border-green-500/30' : 'bg-slate-950 border-slate-800 opacity-60')}`}>
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-2 ${isCompleted ? 'bg-green-500 border-green-500 text-slate-900' : (isCurrent ? 'bg-cyan-600 border-cyan-400 text-white animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-500')}`}>
-                                            {isCompleted ? '✓' : step.id}
-                                        </div>
-                                        <div className="text-left md:text-center">
-                                            <div className={`font-bold text-sm ${isCurrent ? 'text-cyan-400' : 'text-slate-300'}`}>{step.title}</div>
-                                            <div className="text-[10px] text-slate-500 uppercase tracking-wider">{isCompleted ? 'Completed' : (isCurrent ? 'Current Goal' : 'Locked')}</div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                    <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide">
+                        {dailyTasks.map((task, idx) => (
+                            <div key={idx} className={`min-w-[140px] flex-1 p-4 rounded-xl border flex flex-col justify-between transition-all ${task.isToday ? (emergencyMode ? 'bg-red-900/50 border-red-500 shadow-red-500/20 shadow-lg scale-105' : 'bg-cyan-900/20 border-cyan-500 shadow-cyan-500/20 shadow-lg scale-105') : 'bg-slate-900 border-slate-800 opacity-60'}`}>
+                                <div>
+                                    <div className={`text-xs uppercase font-bold mb-1 ${task.isToday ? 'text-white' : 'text-slate-500'}`}>{task.day || task.weekday}</div>
+                                    <div className="text-xs text-slate-400">{task.date}</div>
+                                </div>
+                                <div className="mt-4">
+                                    <div className={`font-bold text-sm leading-tight ${task.isToday ? 'text-white' : 'text-slate-400'}`}>{task.task}</div>
+                                    {task.isToday && (
+                                        <button 
+                                            onClick={task.task.includes("Drill") ? () => setShowDrill(true) : () => setShowTopicModal(true)}
+                                            className={`mt-3 w-full py-1.5 rounded text-[10px] font-bold uppercase tracking-wide ${emergencyMode ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-cyan-600 hover:bg-cyan-500 text-white'}`}
+                                        >
+                                            Start Now
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
-                {/* 4. NOTIFICATIONS */}
-                {isManagedStudent && user.homework && !user.homework.isCompleted && (
-                    <div className="mb-6 bg-indigo-900/20 border border-indigo-500/30 rounded-2xl p-6 relative overflow-hidden animate-fade-in-up">
-                        <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] px-3 py-1 rounded-bl-xl font-bold uppercase">Yangi Vazifa</div>
-                        <h3 className="text-lg font-bold text-indigo-400 mb-2">📚 O'qituvchidan Xabar:</h3>
-                        <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-line bg-slate-900/50 p-4 rounded-xl border border-slate-800">{user.homework.text}</p>
-                    </div>
-                )}
-
-                {showFreeTrialBanner && !user.isEmailVerified && (
-                    <div className="mb-6 bg-red-900/20 border border-red-500/30 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 animate-pulse">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-white font-bold">!</div>
-                            <div>
-                                <h4 className="font-bold text-red-500">Emailingizni tasdiqlang</h4>
-                                <p className="text-xs text-red-400">Bepul imtihonni ishlatish uchun emailingiz tasdiqlangan bo'lishi shart.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={handleVerifyEmail} disabled={verifyingEmail} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-full text-sm font-bold">{verifyingEmail ? 'Yuborilmoqda...' : 'Link yuborish'}</button>
-                            <button onClick={refreshUser} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-4 py-2 rounded-full text-sm font-bold">Tekshirish ⟳</button>
-                        </div>
-                    </div>
-                )}
-
-                {/* 5. GAMIFICATION & MAIN ACTIONS */}
+                {/* 4. MAIN ACTIONS */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-                    
                     {/* A. START EXAM (Big Card) */}
-                    <div onClick={handleStartClick} role="button" className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white p-8 cursor-pointer shadow-2xl shadow-cyan-500/20 group transform transition-all hover:scale-[1.01]">
+                    <div onClick={handleStartClick} role="button" className={`lg:col-span-2 relative overflow-hidden rounded-3xl text-white p-8 cursor-pointer shadow-2xl group transform transition-all hover:scale-[1.01] ${emergencyMode ? 'bg-gradient-to-r from-red-700 to-orange-700 shadow-red-500/30' : 'bg-gradient-to-r from-cyan-600 to-blue-600 shadow-cyan-500/20'}`}>
                         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                         <div className="relative z-10 flex flex-col justify-between h-full min-h-[200px]">
                             <div>
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-bold backdrop-blur-sm border border-white/10">AI EXAMINER 3.0</div>
-                                    <div className="animate-pulse bg-red-500 w-3 h-3 rounded-full"></div>
+                                    <div className="animate-pulse bg-white w-3 h-3 rounded-full"></div>
                                 </div>
-                                <h2 className="text-3xl font-bold mb-2">Imtihon Topshirish</h2>
-                                <p className="text-cyan-100 text-sm">{user.examsLeft && user.examsLeft > 0 ? `Sizda ${user.examsLeft} ta imtihon mavjud.` : "Start Free Trial or Top Up."}</p>
+                                <h2 className="text-3xl font-bold mb-2">{emergencyMode ? "HOT SEAT EXAM" : "Imtihon Topshirish"}</h2>
+                                <p className="opacity-80 text-sm">{user.examsLeft && user.examsLeft > 0 ? `Sizda ${user.examsLeft} ta imtihon mavjud.` : "Top up to start."}</p>
                             </div>
                             <div className="flex justify-between items-end mt-4">
                                 <div className="text-xs bg-white/10 px-2 py-1 rounded">~15 daqiqa</div>
-                                <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-cyan-600 transition-colors shadow-lg group-hover:scale-110">
+                                <div className={`w-14 h-14 bg-white rounded-full flex items-center justify-center transition-colors shadow-lg group-hover:scale-110 ${emergencyMode ? 'text-red-600' : 'text-cyan-600'}`}>
                                     <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* B. DAILY CHALLENGE (Gamification) */}
+                    {/* B. DAILY CHALLENGE */}
                     <div className="lg:col-span-1 bg-purple-900/20 border border-purple-500/30 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
                         <div>
                             <div className="flex justify-between items-start mb-2">
@@ -410,60 +366,45 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                     </div>
                 </div>
 
+                {/* 5. GAMIFICATION & TOOLS */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-                    {/* C. LEADERBOARD (Gamification) */}
                     <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-3xl p-6">
-                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                            <span>🏆</span> Top Students (This Week)
-                        </h3>
+                        <h3 className="text-white font-bold mb-4 flex items-center gap-2"><span>🏆</span> Top Students</h3>
                         <div className="space-y-3">
-                            {[
-                                { n: "Malika S.", s: "7.5", x: "🔥" },
-                                { n: "Jamshid K.", s: "7.0", x: "⚡" },
-                                { n: "Sardor B.", s: "7.0", x: "🚀" }
-                            ].map((s, i) => (
+                            {[{ n: "Malika S.", s: "7.5" }, { n: "Jamshid K.", s: "7.0" }, { n: "Sardor B.", s: "7.0" }].map((s, i) => (
                                 <div key={i} className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
                                     <div className="flex items-center gap-3">
                                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i===0?'bg-yellow-500 text-black': 'bg-slate-700 text-slate-300'}`}>{i+1}</div>
                                         <span className="text-sm text-slate-300">{s.n}</span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-cyan-400">{s.s}</span>
-                                        <span className="text-xs">{s.x}</span>
-                                    </div>
+                                    <span className="text-xs font-bold text-cyan-400">{s.s}</span>
                                 </div>
                             ))}
-                            <div className="text-center pt-2">
-                                <span className="text-xs text-slate-500">You are in top 15%</span>
-                            </div>
                         </div>
                     </div>
 
-                    {/* D. DRILLS & DICTIONARY */}
                     <div className="lg:col-span-2 grid md:grid-cols-2 gap-6">
                         <div onClick={() => setShowDrill(true)} className="bg-slate-900 border border-slate-800 p-6 rounded-3xl cursor-pointer hover:border-purple-500 transition-colors group relative overflow-hidden">
-                            <div className="absolute inset-0 bg-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             <div className="flex justify-between items-start mb-4">
                                 <div className="w-12 h-12 bg-purple-900/30 rounded-xl flex items-center justify-center text-purple-400 text-2xl border border-purple-500/20">🏋️‍♀️</div>
-                                <span className="text-[10px] bg-purple-900/50 text-purple-300 px-3 py-1 rounded-full font-bold uppercase">Micro-Drill</span>
+                                <span className="text-[10px] bg-purple-900/50 text-purple-300 px-3 py-1 rounded-full font-bold uppercase">Visual</span>
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-2">Audio Workout</h3>
-                            <p className="text-xs text-slate-400 leading-relaxed">Listen and repeat. Perfect your pronunciation in 2 mins.</p>
+                            <h3 className="text-xl font-bold text-white mb-2">Shadowing Gym</h3>
+                            <p className="text-xs text-slate-400 leading-relaxed">Listen and repeat. Visual audio feedback included.</p>
                         </div>
 
                         <div onClick={() => setShowDictionary(true)} className="bg-slate-900 border border-slate-800 p-6 rounded-3xl cursor-pointer hover:border-yellow-500 transition-colors group relative overflow-hidden">
-                            <div className="absolute inset-0 bg-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             <div className="flex justify-between items-start mb-4">
                                 <div className="w-12 h-12 bg-yellow-900/30 rounded-xl flex items-center justify-center text-yellow-400 text-2xl border border-yellow-500/20">📚</div>
-                                <span className="text-[10px] bg-yellow-900/50 text-yellow-300 px-3 py-1 rounded-full font-bold uppercase">My Vault</span>
+                                <span className="text-[10px] bg-yellow-900/50 text-yellow-300 px-3 py-1 rounded-full font-bold uppercase">Vault</span>
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-2">Shaxsiy Lug'at</h3>
-                            <p className="text-xs text-slate-400 leading-relaxed">Imtihondan saqlab olingan {dictionary.length} ta so'zni takrorlash.</p>
+                            <h3 className="text-xl font-bold text-white mb-2">My Dictionary</h3>
+                            <p className="text-xs text-slate-400 leading-relaxed">{dictionary.length} saved words.</p>
                         </div>
                     </div>
                 </div>
 
-                {/* 6. URGENCY OFFER BANNER (If not paid) */}
+                {/* 6. URGENCY OFFER */}
                 {!isManagedStudent && !user.hasPaidHistory && (
                     <div className="mb-12 bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl p-[2px] shadow-2xl animate-pulse-slow">
                         <div className="bg-slate-900 rounded-[14px] p-4 md:p-6 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -472,58 +413,44 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h4 className="font-bold text-red-500 uppercase tracking-wider text-sm">One-Time Offer</h4>
-                                        <span className="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded animate-pulse">EXPIRING SOON</span>
+                                        <span className="bg-red-600 text-white text-[9px] px-2 py-0.5 rounded animate-pulse">EXPIRING</span>
                                     </div>
-                                    <p className="text-white font-bold text-lg leading-tight mt-1">Get <span className="text-indigo-400">5 Exam Pack</span> with Priority Analysis</p>
-                                    <p className="text-xs text-slate-500 mt-1">Usually 45,000. Now only 39,000 UZS.</p>
+                                    <p className="text-white font-bold text-lg leading-tight mt-1">Get <span className="text-indigo-400">5 Exam Pack</span></p>
                                 </div>
                             </div>
-                            <button onClick={() => handleBuyPlan(SELF_TARIFFS.FIVE_EXAMS.id)} className="w-full md:w-auto bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold hover:scale-105 transition-transform shadow-lg shadow-red-500/30">Claim Offer</button>
+                            <button onClick={() => handleBuyPlan(SELF_TARIFFS.FIVE_EXAMS.id)} className="w-full md:w-auto bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold">Claim Offer</button>
                         </div>
                     </div>
                 )}
 
-                {/* 7. SHOP SECTION */}
+                {/* 7. SHOP */}
                 {!isManagedStudent && (
                     <div className="mb-12">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-white">Do'kon</h3>
-                            {!isPro && (!user.examsLeft || user.examsLeft === 0) && <span className="text-xs text-red-500 font-medium animate-pulse">Sizda imtihon qolmadi!</span>}
-                        </div>
-
+                        <h3 className="text-xl font-bold text-white mb-6">Do'kon</h3>
                         <div className="grid md:grid-cols-3 gap-6">
                             {/* 1 Exam */}
                             <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col hover:border-cyan-400 transition-all group">
-                                <div className="mb-4"><span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">Start</span></div>
                                 <h4 className="font-bold text-lg text-white mb-2">{SELF_TARIFFS.ONE_EXAM.title}</h4>
-                                <p className="text-xs text-slate-400 mb-6 flex-1">{SELF_TARIFFS.ONE_EXAM.description}</p>
-                                <div className="border-t border-slate-800 pt-4">
-                                    <div className="flex justify-between items-center mb-4"><span className="text-2xl font-bold text-white">{SELF_TARIFFS.ONE_EXAM.price.toLocaleString()}</span><span className="text-xs text-slate-400">so'm</span></div>
+                                <div className="border-t border-slate-800 pt-4 mt-auto">
+                                    <div className="flex justify-between items-center mb-4"><span className="text-2xl font-bold text-white">{SELF_TARIFFS.ONE_EXAM.price.toLocaleString()}</span></div>
                                     <button onClick={() => handleBuyPlan(SELF_TARIFFS.ONE_EXAM.id)} disabled={purchasing} className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold text-sm transition-colors">Sotib Olish</button>
                                 </div>
                             </div>
-
-                            {/* 5 Exams (Highlight) */}
-                            <div className="relative bg-gradient-to-b from-cyan-900 to-slate-900 border border-cyan-500/50 p-6 rounded-3xl flex flex-col shadow-2xl shadow-cyan-900/20 transform md:-translate-y-2">
-                                <div className="absolute top-0 right-0 bg-cyan-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl rounded-tr-2xl">ENG KO'P SOTILADIGAN</div>
+                            {/* 5 Exams */}
+                            <div className="relative bg-gradient-to-b from-cyan-900 to-slate-900 border border-cyan-500/50 p-6 rounded-3xl flex flex-col shadow-2xl">
+                                <div className="absolute top-0 right-0 bg-cyan-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl rounded-tr-2xl">BEST</div>
                                 <h4 className="font-bold text-lg text-white mb-2">{SELF_TARIFFS.FIVE_EXAMS.title}</h4>
-                                <p className="text-xs text-cyan-100/70 mb-6 flex-1">{SELF_TARIFFS.FIVE_EXAMS.description}</p>
-                                <div className="border-t border-white/10 pt-4">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div><span className="text-xs text-slate-400 line-through mr-2">45,000</span><span className="text-3xl font-bold text-white">{SELF_TARIFFS.FIVE_EXAMS.price.toLocaleString()}</span></div>
-                                        <span className="text-xs text-cyan-200">so'm</span>
-                                    </div>
-                                    <button onClick={() => handleBuyPlan(SELF_TARIFFS.FIVE_EXAMS.id)} disabled={purchasing} className="w-full bg-cyan-500 hover:bg-cyan-400 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-cyan-500/30 transition-colors">Paketni Olish</button>
+                                <div className="border-t border-white/10 pt-4 mt-auto">
+                                    <div className="flex justify-between items-center mb-4"><span className="text-3xl font-bold text-white">{SELF_TARIFFS.FIVE_EXAMS.price.toLocaleString()}</span></div>
+                                    <button onClick={() => handleBuyPlan(SELF_TARIFFS.FIVE_EXAMS.id)} disabled={purchasing} className="w-full bg-cyan-500 hover:bg-cyan-400 text-white py-3 rounded-xl font-bold text-sm shadow-lg">Paketni Olish</button>
                                 </div>
                             </div>
-
                             {/* PRO */}
-                            <div className="bg-slate-900 border border-yellow-500/30 p-6 rounded-3xl flex flex-col relative overflow-hidden group hover:border-yellow-500/60 transition-all">
+                            <div className="bg-slate-900 border border-yellow-500/30 p-6 rounded-3xl flex flex-col group hover:border-yellow-500/60 transition-all">
                                 <h4 className="font-bold text-lg text-white mb-2">{SELF_TARIFFS.PRO_SUBSCRIPTION.title}</h4>
-                                <p className="text-xs text-slate-400 mb-6 flex-1">{SELF_TARIFFS.PRO_SUBSCRIPTION.description}</p>
-                                <div className="border-t border-slate-800 pt-4">
-                                    <div className="flex justify-between items-center mb-4"><span className="text-2xl font-bold text-white">{SELF_TARIFFS.PRO_SUBSCRIPTION.price.toLocaleString()}</span><span className="text-xs text-slate-400">so'm / oy</span></div>
-                                    <button onClick={() => handleBuyPlan(SELF_TARIFFS.PRO_SUBSCRIPTION.id)} disabled={purchasing} className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20 transition-colors">Obuna Bo'lish</button>
+                                <div className="border-t border-slate-800 pt-4 mt-auto">
+                                    <div className="flex justify-between items-center mb-4"><span className="text-2xl font-bold text-white">{SELF_TARIFFS.PRO_SUBSCRIPTION.price.toLocaleString()}</span></div>
+                                    <button onClick={() => handleBuyPlan(SELF_TARIFFS.PRO_SUBSCRIPTION.id)} disabled={purchasing} className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white py-3 rounded-xl font-bold text-sm shadow-lg">Obuna Bo'lish</button>
                                 </div>
                             </div>
                         </div>
@@ -534,33 +461,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                 {showPayment && <PaymentModal user={user} onClose={() => setShowPayment(false)} />}
                 {showDrill && <DrillModal onClose={() => setShowDrill(false)} />}
                 
-                {/* TOPIC SELECTION MODAL */}
                 {showTopicModal && (
                     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
                         <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-purple-500"></div>
-                            
                             <h3 className="text-2xl font-bold text-white mb-6 text-center">Select Exam Topic</h3>
-                            
                             <div className="grid gap-4 mb-6">
                                 <button onClick={() => confirmStartExam('random')} className="flex items-center gap-4 p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-cyan-500 transition-all group">
                                     <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center text-2xl group-hover:bg-cyan-900/30">🎲</div>
                                     <div className="text-left">
                                         <div className="font-bold text-white text-lg">Random Topics</div>
-                                        <div className="text-slate-500 text-xs">Standard mix of common IELTS questions.</div>
+                                        <div className="text-slate-500 text-xs">Standard mix.</div>
                                     </div>
                                 </button>
-
-                                <button onClick={() => confirmStartExam('forecast')} className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-purple-900/20 to-slate-900 border border-purple-500/50 hover:border-purple-400 transition-all group relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 bg-purple-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl">HOT</div>
+                                <button onClick={() => confirmStartExam('forecast')} className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-purple-900/20 to-slate-900 border border-purple-500/50 hover:border-purple-400 transition-all group">
                                     <div className="w-12 h-12 bg-purple-900/50 rounded-full flex items-center justify-center text-2xl border border-purple-500/30">🔥</div>
                                     <div className="text-left">
                                         <div className="font-bold text-white text-lg">Jan-Apr 2025 Forecast</div>
-                                        <div className="text-slate-400 text-xs">Most recent questions reported by students.</div>
+                                        <div className="text-slate-400 text-xs">Most recent questions.</div>
                                     </div>
                                 </button>
                             </div>
-
                             <button onClick={() => setShowTopicModal(false)} className="w-full text-slate-500 hover:text-white text-sm">Cancel</button>
                         </div>
                     </div>
@@ -574,21 +494,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                 <button onClick={() => setShowDictionary(false)} className="text-slate-400 hover:text-white">✕</button>
                             </div>
                             <div className="flex-1 overflow-y-auto space-y-4">
-                                {dictionary.length === 0 ? (
-                                    <div className="text-center text-slate-500 py-10">
-                                        <div className="text-4xl mb-4">📭</div>
-                                        <p>Your dictionary is empty.</p>
+                                {dictionary.length === 0 ? <div className="text-center text-slate-500 py-10">Empty.</div> : dictionary.map((item, idx) => (
+                                    <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-slate-800 group relative">
+                                        <button onClick={() => handleRemoveWord(item.word)} className="absolute top-2 right-2 text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">✕</button>
+                                        <h4 className="text-lg font-bold text-cyan-400 mb-1">{item.word}</h4>
+                                        <p className="text-sm text-slate-300 italic mb-2">{item.definition}</p>
+                                        <div className="text-xs text-slate-500 bg-slate-900 p-2 rounded border border-slate-800">"{item.example}"</div>
                                     </div>
-                                ) : (
-                                    dictionary.map((item, idx) => (
-                                        <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-slate-800 group relative">
-                                            <button onClick={() => handleRemoveWord(item.word)} className="absolute top-2 right-2 text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">✕</button>
-                                            <h4 className="text-lg font-bold text-cyan-400 mb-1">{item.word}</h4>
-                                            <p className="text-sm text-slate-300 italic mb-2">{item.definition}</p>
-                                            <div className="text-xs text-slate-500 bg-slate-900 p-2 rounded border border-slate-800">"{item.example}"</div>
-                                        </div>
-                                    ))
-                                )}
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -598,27 +511,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm p-4 animate-fade-in">
                         <div className="glass-card bg-slate-900 w-full max-w-md p-8 rounded-2xl border border-slate-700 shadow-2xl">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-white">Profil Sozlamalari</h3>
+                                <h3 className="text-xl font-bold text-white">Settings</h3>
                                 <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-white">✕</button>
                             </div>
                             <form onSubmit={handleUpdatePassword}>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">Yangi Parol</label>
-                                <input type="password" required placeholder="Yangi parol kiriting..." value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all mb-6" />
-                                <button type="submit" disabled={isSavingPass} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-cyan-500/20 disabled:opacity-50">
-                                    {isSavingPass ? 'Saqlanmoqda...' : 'Parolni Yangilash'}
-                                </button>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">New Password</label>
+                                <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white mb-6" />
+                                <button type="submit" disabled={isSavingPass} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl">Update</button>
                             </form>
-                        </div>
-                    </div>
-                )}
-
-                {showStudentModal && (
-                    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-                        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 w-full max-w-sm text-center shadow-2xl">
-                            <div className="w-16 h-16 bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">!</div>
-                            <h3 className="text-xl font-bold text-white mb-2">Imtihon qolmadi</h3>
-                            <p className="text-slate-400 text-sm mb-6">Davom ettirish uchun o'qituvchingizga murojaat qiling.</p>
-                            <button onClick={() => setShowStudentModal(false)} className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold">Tushunarli</button>
                         </div>
                     </div>
                 )}
