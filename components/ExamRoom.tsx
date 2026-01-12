@@ -6,19 +6,20 @@ import { UserProfile } from '../types';
 
 interface ExamRoomProps {
   user: UserProfile;
+  topicMode?: 'random' | 'forecast';
   onFinish: (transcript: string) => void | Promise<void>;
 }
 
 // Internal phases for logic control
 type ExamPhase = 'WAITING_FOR_TRIGGER' | 'PART1' | 'PART2_PREP' | 'PART2_SPEAKING' | 'PART3';
 
-const ExamRoom: React.FC<ExamRoomProps> = ({ user, onFinish }) => {
+const ExamRoom: React.FC<ExamRoomProps> = ({ user, topicMode = 'random', onFinish }) => {
   // UI States
   const [isConnected, setIsConnected] = useState(false);
   const [status, setStatus] = useState("Connecting..."); 
   const [error, setError] = useState<string | null>(null);
   const [isMicOn, setIsMicOn] = useState(true);
-  const [rulesChecked, setRulesChecked] = useState(false); // NEW CHECKBOX STATE
+  const [rulesChecked, setRulesChecked] = useState(false); 
   
   // Logic Refs
   const currentPhaseRef = useRef<ExamPhase>('WAITING_FOR_TRIGGER');
@@ -213,10 +214,15 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ user, onFinish }) => {
 
       setStatus("Waiting...");
 
-      // UPDATED INSTRUCTION TO FORCE PART 2 SILENCE AND FULL STRUCTURE
+      // DYNAMIC PROMPT BASED ON SELECTION
+      const topicInstruction = topicMode === 'forecast' 
+        ? "MANDATORY: You MUST select Part 1, Part 2, and Part 3 topics from the 'IELTS Speaking Forecast Jan-Apr 2025'. Do NOT use random topics. Common forecast topics: Hometown, Artificial Intelligence, Crowded Places (Part 1), Describe a person/place (Part 2)." 
+        : "You should choose diverse, standard IELTS topics from general question banks. Be unpredictable.";
+
       const systemInstruction = `
       ROLE: You are John, a strict but professional IELTS Speaking Examiner.
       CANDIDATE: ${user.firstName}.
+      MODE: ${topicInstruction}
       
       --- PHASE 0: WAIT FOR TRIGGER ---
       You must REMAIN SILENT initially. Do NOT speak until the user says a trigger phrase like "I am here", "I'm ready", "Hello John" or similar.
@@ -391,6 +397,10 @@ const ExamRoom: React.FC<ExamRoomProps> = ({ user, onFinish }) => {
                     </div>
                     <h2 className="text-2xl text-white font-bold mb-2">Imtihon Xonasi</h2>
                     <p className="text-slate-400 text-sm">Boshlashdan oldin qoidalarni tasdiqlang.</p>
+                    {/* MODE INDICATOR */}
+                    <div className={`mt-2 text-xs font-bold px-3 py-1 rounded-full inline-block ${topicMode === 'forecast' ? 'bg-purple-900 text-purple-300 border border-purple-700' : 'bg-slate-800 text-slate-400'}`}>
+                        Topic Mode: {topicMode.toUpperCase()}
+                    </div>
                 </div>
 
                 <div className="space-y-3 mb-8 text-sm text-slate-300 bg-slate-950 p-4 rounded-xl border border-slate-800">
