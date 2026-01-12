@@ -12,6 +12,9 @@ export interface UserProfile {
   joinedAt?: string;
   lastSeen?: string; 
   
+  // NEW: CORE RETENTION FIELD
+  examDate?: string; // YYYY-MM-DD
+
   // Security & Verification
   isEmailVerified?: boolean;
 
