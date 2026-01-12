@@ -24,6 +24,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
     const [showSettings, setShowSettings] = useState(false);
     const [showStudentModal, setShowStudentModal] = useState(false);
     const [showTopicModal, setShowTopicModal] = useState(false);
+    const [showEmergencyModal, setShowEmergencyModal] = useState(false); // NEW: Explanation Modal
     
     // Emergency & Planning
     const [emergencyMode, setEmergencyMode] = useState(false);
@@ -33,7 +34,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
 
     // Async Actions
     const [purchasing, setPurchasing] = useState(false);
-    const [verifyingEmail, setVerifyingEmail] = useState(false);
     const [isSavingPass, setIsSavingPass] = useState(false);
     const [newPassword, setNewPassword] = useState('');
 
@@ -68,16 +68,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
 
         const today = new Date();
         const target = new Date(examDate);
+        // FIX: Date calculations
         const diffDays = Math.ceil((target.getTime() - today.getTime()) / (1000 * 3600 * 24));
 
         if (diffDays <= 3 && !emergencyMode) {
-            // Suggest Emergency Mode
-            // setEmergencyMode(true); // Can prompt user instead
+            // Suggest Emergency Mode silently or via UI hint
         }
 
         const tasks = [];
         const taskTypes = emergencyMode 
-            ? ["Forecast Part 1", "Forecast Part 2", "Vocab Cramming", "Full Mock"]
+            ? ["🔥 Forecast Part 1 (Rapid Fire)", "🔥 Forecast Part 2 (Templates)", "🔥 Vocab Cramming (High Frequency)", "🔥 Full Mock (Strict Timing)"]
             : ["Part 1 Drill", "Listening Shadowing", "Part 2 Simulation", "Part 3 Logic", "Full Mock"];
 
         // Generate next 5 days
@@ -99,7 +99,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
         // Countdown Logic
         const interval = setInterval(() => {
             const now = new Date().getTime();
-            const distance = target.getTime() - now;
+            const distance = new Date(examDate).getTime() - now;
             if (distance < 0) {
                 setTimeLeft("IMTIHON KUNI!");
             } else {
@@ -125,6 +125,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
 
     const handleSetExamDate = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const d = e.target.value;
+        if (!d) return;
         setExamDate(d);
         localStorage.setItem('target_exam_date', d);
         
@@ -234,7 +235,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
     const handleLogout = () => { logoutUser(); onLogout(); };
     const isPro = user.subscriptionPlan === 'pro';
     const isManagedStudent = !!user.teacherId;
-    const showFreeTrialBanner = !isManagedStudent && !user.hasPaidHistory && !user.hasUsedFreeTrial;
 
     // --- RENDER ---
     return (
@@ -260,26 +260,37 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                     <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
                                     Target: {user.targetLevel}
                                 </p>
-                                {/* EXAM DATE */}
-                                <div className={`flex items-center gap-2 border rounded-lg px-2 py-0.5 relative group cursor-pointer transition-colors ${emergencyMode ? 'bg-red-900 border-red-700' : 'bg-slate-900 border-slate-800 hover:border-red-500'}`}>
+                                
+                                {/* EXAM DATE - FIXED CLICK */}
+                                <div className={`relative flex items-center gap-2 border rounded-lg px-2 py-0.5 group cursor-pointer transition-colors ${emergencyMode ? 'bg-red-900 border-red-700' : 'bg-slate-900 border-slate-800 hover:border-red-500'}`}>
                                     {timeLeft ? (
-                                        <span className="text-[10px] font-bold text-red-400 animate-pulse uppercase tracking-wide">⏳ {timeLeft}</span>
+                                        <span className="text-[10px] font-bold text-red-400 animate-pulse uppercase tracking-wide pointer-events-none">⏳ {timeLeft}</span>
                                     ) : (
-                                        <span className="text-[10px] text-slate-400 group-hover:text-red-500">Imtihon qachon?</span>
+                                        <span className="text-[10px] text-slate-400 group-hover:text-red-500 pointer-events-none">Imtihon qachon?</span>
                                     )}
-                                    <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleSetExamDate} value={examDate || ''} />
+                                    {/* Input needs z-index to be clickable over the text */}
+                                    <input 
+                                        type="date" 
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" 
+                                        onChange={handleSetExamDate} 
+                                        value={examDate || ''} 
+                                    />
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                        {/* Emergency Toggle */}
+                        {/* Emergency Toggle with Explanation */}
                         <button 
-                            onClick={() => setEmergencyMode(!emergencyMode)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${emergencyMode ? 'bg-red-600 border-red-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-red-500 hover:border-red-500'}`}
+                            onClick={() => setShowEmergencyModal(true)}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all flex items-center gap-2 ${emergencyMode ? 'bg-red-600 border-red-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-red-500 hover:border-red-500'}`}
                         >
-                            {emergencyMode ? '⚠️ PANIC MODE ON' : '🚨 EMERGENCY MODE'}
+                            {emergencyMode ? (
+                                <><span>🚨</span> INTENSIVE ON</>
+                            ) : (
+                                <><span>🛡️</span> EMERGENCY MODE</>
+                            )}
                         </button>
 
                         {!isManagedStudent && (
@@ -290,7 +301,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                                 </div>
                             </div>
                         )}
-                        <button onClick={handleLogout} className="text-xs font-bold text-slate-500 hover:text-red-400 transition-colors border border-slate-800 px-5 py-3 rounded-xl hover:bg-slate-900">EXIT</button>
+                        
+                        {/* SETTINGS BUTTON - RESTORED */}
+                        <button 
+                            onClick={() => setShowSettings(true)}
+                            className="p-3 bg-slate-900 border border-slate-700 hover:border-white rounded-xl text-slate-400 hover:text-white transition-colors"
+                            title="Sozlamalar"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        </button>
+
+                        <button onClick={handleLogout} className="text-xs font-bold text-slate-500 hover:text-red-400 transition-colors border border-slate-800 px-5 py-3 rounded-xl hover:bg-slate-900">CHIQISH</button>
                     </div>
                 </header>
 
@@ -461,6 +482,49 @@ const Dashboard: React.FC<DashboardProps> = ({ user: initialUser, onStartExam, o
                 {showPayment && <PaymentModal user={user} onClose={() => setShowPayment(false)} />}
                 {showDrill && <DrillModal onClose={() => setShowDrill(false)} />}
                 
+                {/* EMERGENCY MODE EXPLANATION MODAL */}
+                {showEmergencyModal && (
+                    <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
+                        <div className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-3xl w-full max-w-2xl shadow-2xl relative">
+                            <button onClick={() => setShowEmergencyModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+                            
+                            <h2 className="text-2xl md:text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                                🚨 Intensive / Emergency Mode
+                            </h2>
+                            <p className="text-slate-400 mb-8 text-sm md:text-base">Imtihonga oz qolganda (3-7 kun) foydalanish tavsiya etiladi.</p>
+
+                            <div className="grid md:grid-cols-2 gap-6 mb-8">
+                                <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800">
+                                    <h4 className="text-cyan-400 font-bold mb-4 uppercase tracking-widest text-sm">Standard Rejim</h4>
+                                    <ul className="space-y-3 text-sm text-slate-300">
+                                        <li className="flex gap-2">✅ <span className="flex-1">Chuqur grammatika va lug'at boyligi</span></li>
+                                        <li className="flex gap-2">✅ <span className="flex-1">Barcha turdagi savollar (Random)</span></li>
+                                        <li className="flex gap-2">✅ <span className="flex-1">Uzoq muddatli rivojlanish</span></li>
+                                    </ul>
+                                </div>
+                                <div className="p-5 rounded-2xl bg-red-950/20 border border-red-900/50">
+                                    <h4 className="text-red-500 font-bold mb-4 uppercase tracking-widest text-sm">Intensive Mode</h4>
+                                    <ul className="space-y-3 text-sm text-slate-300">
+                                        <li className="flex gap-2">🔥 <span className="flex-1 text-white font-medium">Faqat Forecast (Jan-Apr 2025)</span></li>
+                                        <li className="flex gap-2">🔥 <span className="flex-1">Tayyor "Band 7.5" shablonlar</span></li>
+                                        <li className="flex gap-2">🔥 <span className="flex-1">Tezkor yodlash (Cramming)</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={() => {
+                                    setEmergencyMode(!emergencyMode);
+                                    setShowEmergencyModal(false);
+                                }}
+                                className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${emergencyMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-red-600 hover:bg-red-500 text-white'}`}
+                            >
+                                {emergencyMode ? 'Standard Rejimga Qaytish' : 'Activate Intensive Mode'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {showTopicModal && (
                     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
                         <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative overflow-hidden">
