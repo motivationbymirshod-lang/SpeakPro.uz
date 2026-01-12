@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { ExamResult, UserProfile } from '../types';
-import { getCurrentUser, saveUser } from '../utils/storageUtils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
+import { getCurrentUser } from '../utils/storageUtils';
+import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from 'recharts';
 import PaymentModal from './PaymentModal';
 
 interface ResultsProps {
@@ -13,8 +13,8 @@ interface ResultsProps {
 const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
     const [currentUser, setCurrentUser] = useState<UserProfile | null>(getCurrentUser());
     const [showPayment, setShowPayment] = useState(false);
-    const [unlocking, setUnlocking] = useState(false);
     const [showModelAnswer, setShowModelAnswer] = useState(false);
+    const [showCertificate, setShowCertificate] = useState(false);
 
     // Feedback State
     const [feedbackRating, setFeedbackRating] = useState(0);
@@ -35,7 +35,6 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
 
     const unlockResultDirectly = async () => {
         if (!window.confirm("3,000 so'm evaziga natijani ochishni tasdiqlaysizmi?")) return;
-        setUnlocking(true);
         try {
             const res = await fetch('https://speakpro-uz.onrender.com/api/wallet/purchase-plan', {
                 method: 'POST',
@@ -53,28 +52,7 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
             } else {
                 alert(data.message);
             }
-        } catch (e) {
-            alert("Error unlocking");
-        } finally {
-            setUnlocking(false);
-        }
-    };
-
-    const addToDictionary = async (word: string) => {
-        if(!currentUser) return;
-        try {
-            await fetch('https://speakpro-uz.onrender.com/api/user/dictionary/add', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    userId: currentUser._id,
-                    word: word,
-                    definition: "Saved from Exam Feedback",
-                    example: "Review context in exam result."
-                })
-            });
-            alert(`"${word}" lug'atga qo'shildi!`);
-        } catch(e) { alert("Xatolik"); }
+        } catch (e) { alert("Error unlocking"); }
     };
 
     const submitFeedback = async () => {
@@ -101,6 +79,18 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
         { subject: 'Pronunciation', A: result.pronunciation.score, fullMark: 9 },
     ];
 
+    const printCertificate = () => {
+        const printContent = document.getElementById('certificate-area');
+        if (printContent) {
+            const win = window.open('', '', 'width=900,height=650');
+            if(win) {
+                win.document.write(`<html><head><title>Certificate</title><script src="https://cdn.tailwindcss.com"></script></head><body>${printContent.outerHTML}</body></html>`);
+                win.document.close();
+                win.print();
+            }
+        }
+    };
+
     return (
         <div className="max-w-6xl mx-auto p-4 md:p-6 mt-6 text-slate-900 dark:text-slate-200 animate-fade-in-up pb-20 relative transition-colors duration-300">
 
@@ -121,16 +111,16 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
                     <h2 className="text-2xl font-bold dark:text-white text-slate-900 tracking-widest uppercase">Detailed <span className="text-cyan-600 dark:text-cyan-400">Feedback</span></h2>
                     {isLocked && <p className="text-xs text-red-500 font-bold uppercase tracking-wider">LOCKED PREVIEW</p>}
                 </div>
-                <div className="text-xs font-mono text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1 rounded-full">
-                    Verified by SpeakPro AI
-                </div>
+                {/* CERTIFICATE BUTTON */}
+                <button onClick={() => setShowCertificate(true)} className="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-4 py-2 rounded-full font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-2">
+                    <span className="text-lg">📜</span> Get Certificate
+                </button>
             </div>
 
             <div className="grid lg:grid-cols-3 gap-6 mb-8">
-                {/* Main Score Card (ALWAYS VISIBLE) */}
+                {/* Main Score Card */}
                 <div className="glass-card p-6 rounded-2xl border border-slate-200 dark:border-slate-700 relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-white to-slate-100 dark:from-slate-900 dark:to-slate-800">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl"></div>
-
                     <div className="relative z-10 text-center">
                         <div className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Overall Band Score</div>
                         <div className="text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-cyan-400 dark:to-blue-500 mb-2 drop-shadow-lg">
@@ -155,16 +145,13 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
                             <div className="bg-slate-900/90 p-6 rounded-2xl text-center max-w-sm shadow-2xl border border-slate-700">
                                 <div className="text-4xl mb-3">🔒</div>
                                 <h3 className="text-xl font-bold text-white mb-2">Unlock Full Report</h3>
-                                <p className="text-sm text-slate-300 mb-6">See your exact scores for Fluency, Vocabulary, Grammar, and Pronunciation.</p>
-                                <button onClick={handleUnlockClick} className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold py-3 px-8 rounded-full shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2 w-full">
+                                <button onClick={handleUnlockClick} className="bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold py-3 px-8 rounded-full shadow-xl hover:scale-105 transition-transform w-full">
                                     <span>Unlock (3,000 UZS)</span>
                                 </button>
                             </div>
                         </div>
                     )}
-
                     <h3 className="text-sm text-slate-500 dark:text-slate-400 uppercase mb-2 pl-4">Skill Breakdown</h3>
-
                     <div className={`h-64 w-full transition-all duration-300 ${isLocked ? 'blur-md opacity-50' : ''}`}>
                         <ResponsiveContainer width="100%" height="100%">
                             <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
@@ -178,48 +165,18 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
                 </div>
             </div>
 
-            {/* BAND 9.0 MODEL ANSWER (NEW) */}
-            {!isLocked && result.band9Response && (
-                <div className="mb-8">
-                    <button 
-                        onClick={() => setShowModelAnswer(!showModelAnswer)}
-                        className="w-full flex items-center justify-between bg-gradient-to-r from-green-900 to-emerald-900 border border-green-700/50 p-4 rounded-xl text-white hover:bg-green-800 transition-all shadow-lg group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <span className="text-2xl">🏆</span>
-                            <div className="text-left">
-                                <div className="font-bold text-lg">Compare with Band 9.0</div>
-                                <div className="text-xs text-green-300">See how a native speaker would answer this topic.</div>
-                            </div>
-                        </div>
-                        <span className={`transform transition-transform ${showModelAnswer ? 'rotate-180' : ''}`}>▼</span>
-                    </button>
-                    
-                    {showModelAnswer && (
-                        <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-b-xl mt-1 animate-fade-in">
-                            <p className="text-slate-300 leading-relaxed italic whitespace-pre-line border-l-2 border-green-500 pl-4">
-                                {result.band9Response}
-                            </p>
-                            <div className="mt-4 flex gap-2">
-                                <button onClick={() => addToDictionary("Advanced Vocab")} className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded border border-slate-700">Save Vocabulary from this answer</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
             {/* DETAILED CRITERIA GRID (LOCKED) */}
             <div className={`grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 transition-all relative ${isLocked ? 'pointer-events-none select-none' : ''}`}>
                 {isLocked && (
                     <div className="absolute inset-0 z-20 backdrop-blur-sm bg-white/10 dark:bg-black/20 rounded-2xl flex items-center justify-center border border-white/20"></div>
                 )}
                 {[
-                    { title: 'Fluency', data: result.fluency, color: 'text-green-600 dark:text-green-400', border: 'border-green-500/30' },
-                    { title: 'Lexical', data: result.lexical, color: 'text-yellow-600 dark:text-yellow-400', border: 'border-yellow-500/30' },
-                    { title: 'Grammar', data: result.grammar, color: 'text-blue-600 dark:text-blue-400', border: 'border-blue-500/30' },
-                    { title: 'Pronunciation', data: result.pronunciation, color: 'text-purple-600 dark:text-purple-400', border: 'border-purple-500/30' },
+                    { title: 'Fluency', data: result.fluency, color: 'text-green-600 dark:text-green-400' },
+                    { title: 'Lexical', data: result.lexical, color: 'text-yellow-600 dark:text-yellow-400' },
+                    { title: 'Grammar', data: result.grammar, color: 'text-blue-600 dark:text-blue-400' },
+                    { title: 'Pronunciation', data: result.pronunciation, color: 'text-purple-600 dark:text-purple-400' },
                 ].map((item, idx) => (
-                    <div key={idx} className={`bg-white dark:bg-slate-900 p-5 rounded-xl border ${item.border} hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm ${isLocked ? 'blur-[4px]' : ''}`}>
+                    <div key={idx} className={`bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm ${isLocked ? 'blur-[4px]' : ''}`}>
                         <div className="flex justify-between items-end mb-2">
                             <h4 className="font-bold text-slate-700 dark:text-slate-300">{item.title}</h4>
                             <span className={`text-2xl font-bold ${item.color}`}>{item.data.score}</span>
@@ -229,89 +186,98 @@ const Results: React.FC<ResultsProps> = ({ result, onRestart }) => {
                 ))}
             </div>
 
-            {/* Personalized Drills (LOCKED) */}
-            <div className="mb-10 transition-all relative">
-                <h3 className="text-xl font-bold dark:text-white text-slate-900 mb-4 flex items-center gap-2">
-                    <svg className="w-6 h-6 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-                    Personalized Drills Generator
-                </h3>
-
-                {isLocked && (
-                    <div className="absolute inset-0 top-10 z-20 backdrop-blur-md bg-white/40 dark:bg-black/60 rounded-xl flex flex-col items-center justify-center text-center p-6 border border-slate-200 dark:border-slate-800">
-                        <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Drills are Locked</h4>
-                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">Unlock to practice your specific weak points.</p>
-                        <button onClick={handleUnlockClick} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-full font-bold shadow-lg">Unlock Now</button>
-                    </div>
-                )}
-
-                <div className={`grid md:grid-cols-3 gap-6 ${isLocked ? 'blur-[5px]' : ''}`}>
-                    {result.drills?.map((drill, idx) => (
-                        <div key={idx} className="glass-card p-5 rounded-xl border-l-4 border-orange-500 bg-white/60 dark:bg-slate-900/60">
-                            <h4 className="font-bold text-orange-600 dark:text-orange-400 mb-2">{drill.title}</h4>
-                            <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{drill.instruction}</p>
-                            <div className="bg-slate-100 dark:bg-slate-950 p-3 rounded text-xs font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
-                                <span className="text-green-600 dark:text-green-500">Example:</span> {drill.example}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* FEEDBACK SECTION (Rate this Exam) */}
+            {/* FEEDBACK */}
             {!isLocked && (
                 <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 mb-10 flex flex-col md:flex-row gap-6 items-center">
                     <div className="flex-1">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Rate AI Accuracy</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400">Did the AI examiner grade you fairly? Your feedback improves the system.</p>
                     </div>
-
                     <div className="flex-1 w-full md:w-auto">
                         {!feedbackSent ? (
                             <div className="flex flex-col gap-3">
                                 <div className="flex justify-center md:justify-start gap-2">
                                     {[1, 2, 3, 4, 5].map(star => (
-                                        <button
-                                            key={star}
-                                            onClick={() => setFeedbackRating(star)}
-                                            className={`text-2xl transition-transform hover:scale-110 ${star <= feedbackRating ? 'text-yellow-400' : 'text-slate-300 dark:text-slate-600'}`}
-                                        >
-                                            ★
-                                        </button>
+                                        <button key={star} onClick={() => setFeedbackRating(star)} className={`text-2xl transition-transform hover:scale-110 ${star <= feedbackRating ? 'text-yellow-400' : 'text-slate-300 dark:text-slate-600'}`}>★</button>
                                     ))}
                                 </div>
                                 <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={feedbackText}
-                                        onChange={(e) => setFeedbackText(e.target.value)}
-                                        placeholder="Optional comment..."
-                                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-cyan-500"
-                                    />
-                                    <button
-                                        onClick={submitFeedback}
-                                        disabled={feedbackRating === 0}
-                                        className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded font-bold text-sm disabled:opacity-50"
-                                    >
-                                        Send
-                                    </button>
+                                    <input type="text" value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} placeholder="Optional comment..." className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-cyan-500" />
+                                    <button onClick={submitFeedback} disabled={feedbackRating === 0} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded font-bold text-sm disabled:opacity-50">Send</button>
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-green-500 font-bold text-sm flex items-center gap-2">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                Feedback Received. Thank you!
-                            </div>
+                            <div className="text-green-500 font-bold text-sm flex items-center gap-2">Feedback Received. Thank you!</div>
                         )}
                     </div>
                 </div>
             )}
 
             <div className="mt-12 text-center">
-                <button onClick={onRestart} className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-cyan-50 text-white dark:text-slate-900 font-bold py-4 px-12 rounded-full transition shadow-[0_0_30px_rgba(0,0,0,0.2)] dark:shadow-[0_0_30px_rgba(255,255,255,0.2)] transform hover:scale-105">
-                    START NEW EXAM
-                </button>
-                <p className="text-xs text-slate-500 mt-2">Ready to improve further?</p>
+                <button onClick={onRestart} className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-cyan-50 text-white dark:text-slate-900 font-bold py-4 px-12 rounded-full transition shadow-[0_0_30px_rgba(0,0,0,0.2)] dark:shadow-[0_0_30px_rgba(255,255,255,0.2)] transform hover:scale-105">START NEW EXAM</button>
             </div>
+
+            {/* CERTIFICATE MODAL */}
+            {showCertificate && currentUser && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl overflow-hidden max-w-4xl w-full relative">
+                        <button onClick={() => setShowCertificate(false)} className="absolute top-4 right-4 text-slate-500 hover:text-black z-50 bg-white rounded-full p-2">✕ Close</button>
+                        <div id="certificate-area" className="p-10 border-[10px] border-slate-900 relative bg-white text-slate-900" style={{ fontFamily: 'serif' }}>
+                            <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+                            
+                            <div className="flex justify-between items-start mb-10 relative z-10">
+                                <div className="text-left">
+                                    <h1 className="text-4xl font-bold tracking-tight text-slate-900">SpeakPro AI</h1>
+                                    <p className="text-sm uppercase tracking-widest text-slate-500">Official Test Report Form</p>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-6xl font-bold text-slate-900">{result.overallBand}</div>
+                                    <div className="text-xs uppercase font-bold text-slate-500">Overall Band Score</div>
+                                </div>
+                            </div>
+
+                            <div className="mb-12 relative z-10">
+                                <p className="text-lg text-slate-600 mb-2 italic">This is to certify that</p>
+                                <h2 className="text-5xl font-bold text-slate-900 mb-4 font-serif italic border-b-2 border-slate-200 pb-2 inline-block min-w-[50%]">{currentUser.firstName} {currentUser.lastName}</h2>
+                                <p className="text-lg text-slate-600">has completed the Speaking Module on <span className="font-bold">{new Date().toLocaleDateString()}</span></p>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-4 mb-12 border-t border-b border-slate-200 py-6 relative z-10">
+                                <div className="text-center border-r border-slate-200 last:border-0">
+                                    <div className="text-xs uppercase font-bold text-slate-500 mb-1">Fluency</div>
+                                    <div className="text-3xl font-bold">{result.fluency.score}</div>
+                                </div>
+                                <div className="text-center border-r border-slate-200 last:border-0">
+                                    <div className="text-xs uppercase font-bold text-slate-500 mb-1">Lexical</div>
+                                    <div className="text-3xl font-bold">{result.lexical.score}</div>
+                                </div>
+                                <div className="text-center border-r border-slate-200 last:border-0">
+                                    <div className="text-xs uppercase font-bold text-slate-500 mb-1">Grammar</div>
+                                    <div className="text-3xl font-bold">{result.grammar.score}</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-xs uppercase font-bold text-slate-500 mb-1">Pronunciation</div>
+                                    <div className="text-3xl font-bold">{result.pronunciation.score}</div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-end relative z-10">
+                                <div className="text-xs text-slate-400 max-w-xs">
+                                    <p>Verified by SpeakPro Artificial Intelligence Scoring System.</p>
+                                    <p>Validation ID: {result._id || "SP-" + Date.now()}</p>
+                                </div>
+                                <div className="text-center">
+                                    <img src="/signature.png" alt="" className="h-10 mx-auto opacity-50 mb-2" onError={(e) => e.currentTarget.style.display='none'} />
+                                    <div className="w-48 border-t border-slate-900 pt-2 text-xs uppercase font-bold">Chief Examiner</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-100 p-4 text-center">
+                            <button onClick={printCertificate} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-8 rounded shadow-lg">Download PDF / Print</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
