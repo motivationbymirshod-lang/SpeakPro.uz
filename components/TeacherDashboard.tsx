@@ -5,6 +5,7 @@ import PaymentModal from './PaymentModal';
 import { logoutUser, saveUser } from '../utils/storageUtils';
 import { TEACHER_TARIFFS } from '../config/teacherTariffs';
 import { API_BASE_URL } from '../src/config/api';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface TeacherDashboardProps {
   user: UserProfile;
@@ -19,34 +20,28 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
-  const [showEditModal, setShowEditModal] = useState<TeacherStudent | null>(null); // For password reset
-  const [showHomeworkModal, setShowHomeworkModal] = useState<TeacherStudent | null>(null); // For assigning homework
+  const [showEditModal, setShowEditModal] = useState<TeacherStudent | null>(null);
+  const [showHomeworkModal, setShowHomeworkModal] = useState<TeacherStudent | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   
-  // Loading States
   const [purchasing, setPurchasing] = useState(false);
-  const [distributing, setDistributing] = useState<string | null>(null); // student ID being processed
+  const [distributing, setDistributing] = useState<string | null>(null);
   const [assigningHomework, setAssigningHomework] = useState(false);
 
-  // Create Student Form
   const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', email: '', password: '' });
-  // Edit Student Form
   const [editForm, setEditForm] = useState({ password: '' });
-  // Homework Form
   const [homeworkText, setHomeworkText] = useState('');
 
   // REFRESH DATA
   useEffect(() => {
     const refreshData = async () => {
          try {
-             // 1. Refresh User (Balance/Credits)
              const uRes = await fetch(`${API_BASE_URL}/api/user/${initialUser.email}`);
              if(uRes.ok) {
                  const uData = await uRes.json();
                  setUser(uData);
                  saveUser(uData);
              }
-             // 2. Refresh Students
              const sRes = await fetch(`${API_BASE_URL}/api/teacher/students?teacherId=${initialUser._id || initialUser.id}`);
              if (sRes.ok) {
                  const sData = await sRes.json();
@@ -68,6 +63,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
     setFilteredStudents(filtered);
   }, [searchQuery, students]);
 
+  // ANALYTICS DATA PREP
+  const analyticsData = students
+    .filter(s => s.lastExam)
+    .map((s, i) => ({
+        name: s.firstName,
+        score: s.lastExam?.overallBand || 0
+    }))
+    .slice(0, 10); // Show top 10 recent
+
   // ACTIONS
 
   const handleAddStudent = async (e: React.FormEvent) => {
@@ -83,7 +87,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
               alert("O'quvchi muvaffaqiyatli qo'shildi!");
               setShowAddModal(false);
               setNewStudent({ firstName: '', lastName: '', email: '', password: '' });
-              // Refresh List
               const sRes = await fetch(`${API_BASE_URL}/api/teacher/students?teacherId=${user._id || user.id}`);
               const sData = await sRes.json();
               setStudents(sData);
@@ -100,9 +103,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
           }
           return;
       }
-
       if (!window.confirm(`Hamyondan ${tariff.price.toLocaleString()} so'm yechiladi. "${tariff.title}" paketini olasizmi?`)) return;
-
       setPurchasing(true);
       try {
           const res = await fetch(`${API_BASE_URL}/api/wallet/purchase-plan`, {
@@ -127,7 +128,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
           alert("Sizda kreditlar qolmagan. Iltimos, paket sotib oling.");
           return;
       }
-      
       setDistributing(studentId);
       try {
           const res = await fetch(`${API_BASE_URL}/api/teacher/distribute-credit`, {
@@ -137,7 +137,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
           });
           const data = await res.json();
           if (res.ok) {
-              // Local update for immediate UI feedback
               setUser(prev => ({ ...prev, examsLeft: data.teacherRemaining }));
               setStudents(prev => prev.map(s => s._id === studentId ? { ...s, examsLeft: data.studentCredits } : s));
           } else {
@@ -169,7 +168,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
   const handleAssignHomework = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!showHomeworkModal || !homeworkText.trim()) return;
-
       setAssigningHomework(true);
       try {
           const res = await fetch(`${API_BASE_URL}/api/teacher/assign-homework`, {
@@ -192,6 +190,59 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
           alert("Server bilan aloqa yo'q");
       } finally {
           setAssigningHomework(false);
+      }
+  };
+
+  // PRINT FUNCTION
+  const handlePrintReport = (student: TeacherStudent) => {
+      if (!student.lastExam) {
+          alert("This student has no exam results yet.");
+          return;
+      }
+      const printWindow = window.open('', '', 'width=800,height=600');
+      if (printWindow) {
+          printWindow.document.write(`
+              <html>
+              <head>
+                  <title>SpeakPro Report - ${student.firstName}</title>
+                  <style>
+                      body { font-family: sans-serif; padding: 40px; color: #333; }
+                      h1 { color: #2563eb; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+                      .score-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+                      .big-score { font-size: 48px; font-weight: bold; color: #0f172a; }
+                      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+                      .stat { background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 4px; }
+                      .footer { margin-top: 50px; font-size: 12px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+                  </style>
+              </head>
+              <body>
+                  <h1>SpeakPro Performance Report</h1>
+                  <h2>Student: ${student.firstName} ${student.lastName}</h2>
+                  <p>Date: ${new Date().toLocaleDateString()}</p>
+                  
+                  <div class="score-box">
+                      <div>Overall Band Score</div>
+                      <div class="big-score">${student.lastExam.overallBand}</div>
+                  </div>
+
+                  <div class="grid">
+                      <div class="stat">Fluency: <strong>${(student.lastExam as any).fluencyScore || student.lastExam.scores?.f}</strong></div>
+                      <div class="stat">Lexical Resource: <strong>${(student.lastExam as any).lexicalScore || student.lastExam.scores?.l}</strong></div>
+                      <div class="stat">Grammar: <strong>${(student.lastExam as any).grammarScore || student.lastExam.scores?.g}</strong></div>
+                      <div class="stat">Pronunciation: <strong>${(student.lastExam as any).pronunciationScore || student.lastExam.scores?.p}</strong></div>
+                  </div>
+
+                  <h3>Weakness Analysis:</h3>
+                  <p>${student.lastExam.weaknessTags?.join(', ') || "No specific weaknesses detected."}</p>
+
+                  <div class="footer">
+                      Generated by SpeakPro AI for ${user.firstName} ${user.lastName} (Education Partner)
+                  </div>
+                  <script>window.print();</script>
+              </body>
+              </html>
+          `);
+          printWindow.document.close();
       }
   };
 
@@ -231,8 +282,28 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
                 </div>
             </header>
 
+            {/* NEW: GROUP ANALYTICS CHART */}
+            <div className="mb-10 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <h2 className="text-lg font-bold text-white mb-4">Group Performance Trend</h2>
+                <div className="h-64 w-full">
+                    {analyticsData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={analyticsData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                <XAxis dataKey="name" stroke="#94a3b8" />
+                                <YAxis domain={[0, 9]} stroke="#94a3b8" />
+                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                <Line type="monotone" dataKey="score" stroke="#06b6d4" strokeWidth={3} activeDot={{ r: 8 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-slate-500">No exam data available yet.</div>
+                    )}
+                </div>
+            </div>
+
             {/* PRICING STORE (Credit Bank) */}
-            <div className="mb-10 animate-fade-in-up">
+            <div className="mb-10">
                 <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                     <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     Kreditlar Do'koni (Paketlar)
@@ -357,6 +428,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                                         </button>
                                         
+                                        {/* PRINT REPORT (NEW) */}
+                                        <button 
+                                            onClick={() => handlePrintReport(s)}
+                                            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                                            title="Hisobotni chiqarish (PDF)"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                        </button>
+
                                         {/* EDIT PASSWORD */}
                                         <button 
                                             onClick={() => { setShowEditModal(s); setEditForm({password: ''}); }}
@@ -366,7 +446,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                         </button>
 
-                                        {/* NEW: ASSIGN HOMEWORK */}
+                                        {/* ASSIGN HOMEWORK */}
                                         <button 
                                             onClick={() => { setShowHomeworkModal(s); setHomeworkText(''); }}
                                             className="p-2 text-indigo-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
@@ -388,7 +468,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
                                 </td>
                             </tr>
                             
-                            {/* EXPANDED DETAILS (Fixed Score Mapping) */}
+                            {/* EXPANDED DETAILS */}
                             {expandedRow === s._id && s.lastExam && (
                                 <tr className="bg-slate-900/30 shadow-inner animate-fade-in-up">
                                     <td colSpan={5} className="p-6">
@@ -397,7 +477,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user: initialUser, 
                                                 <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 tracking-wider">Detailed Scores</h4>
                                                 <div className="grid grid-cols-4 gap-3">
                                                     {[
-                                                        // FIX: Map directly to flattened Mongoose response keys
                                                         { l: 'Fluency', v: (s.lastExam as any).fluencyScore || (s.lastExam.scores?.f), c: 'text-green-400' },
                                                         { l: 'Lexical', v: (s.lastExam as any).lexicalScore || (s.lastExam.scores?.l), c: 'text-yellow-400' },
                                                         { l: 'Grammar', v: (s.lastExam as any).grammarScore || (s.lastExam.scores?.g), c: 'text-blue-400' },
